@@ -41,7 +41,8 @@ import {
   X,
   Puzzle,
   Layout,
-  Mail
+  Mail,
+  Database
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { usePluginSystem } from '../plugins/PluginContext';
@@ -53,12 +54,14 @@ import { ImageOptimizerDashboardWidget } from '../plugins/components/ImageOptimi
 import { SeoToolkitEditorWidget } from '../plugins/components/SeoToolkitEditorWidget';
 import { AffiliateCloakerEditorWidget } from '../plugins/components/AffiliateCloakerEditorWidget';
 import { Article, CameraProduct, ArticleCategory, CameraCategory, ArticleBlock, MediaAsset, HomePageSettings } from '../types';
-import { readFileAsOptimizedDataUrl } from '../utils/imageUtils';
+import { readFileAsOptimizedDataUrl, DEFAULT_ARTICLE_IMAGE, DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 import { CURRENCY_OPTIONS, formatCurrencyPrice, normalizeCurrencyCode } from '../utils/currency';
 import { HomeEditorCMS } from '../components/HomeEditorCMS';
 import { ArticleSEOEditor } from '../components/ArticleSEOEditor';
 import { SiteBuilderManager } from '../components/SiteBuilderManager';
 import { NewsletterAdminManager } from '../components/NewsletterAdminManager';
+import { SupabaseManager } from '../components/SupabaseManager';
+
 
 export const AdminCMS: React.FC = () => {
   const { 
@@ -632,8 +635,10 @@ export const AdminCMS: React.FC = () => {
                 updateBadge: availableUpdatesCount > 0 ? availableUpdatesCount : undefined 
               },
               { id: 'media', label: 'Media Asset Library', icon: ImageIcon },
+              { id: 'supabase', label: 'Supabase Database', icon: Database, highlightBadge: 'Live' },
               { id: 'categories', label: 'Taxonomy & Categories', icon: Layers },
               { id: 'settings', label: 'Platform & SEO Settings', icon: Settings },
+
             ].map((item) => {
               const Icon = item.icon;
               const isActive = adminTab === item.id;
@@ -1003,21 +1008,29 @@ export const AdminCMS: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EEEBE6]">
-                  {articles
-                    .filter((a) => {
-                      const matchesSearch = 
-                        a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        a.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        a.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
-                      const matchesStatus = activeFilterStatus === 'all' || a.status === activeFilterStatus;
-                      const matchesCategory = activeFilterCategory === 'all' || a.category === activeFilterCategory;
-                      return matchesSearch && matchesStatus && matchesCategory;
-                    })
-                    .map((art) => (
+                  {articles.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-12 text-center text-[#888]">
+                        <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="text-xs">No articles found in database. Click "Create New Article" to compose one.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    articles
+                      .filter((a) => {
+                        const matchesSearch = 
+                          a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          a.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          a.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+                        const matchesStatus = activeFilterStatus === 'all' || a.status === activeFilterStatus;
+                        const matchesCategory = activeFilterCategory === 'all' || a.category === activeFilterCategory;
+                        return matchesSearch && matchesStatus && matchesCategory;
+                      })
+                      .map((art) => (
                       <tr key={art.id} className="hover:bg-[#FDFCFB] transition-colors">
                         <td className="p-4 max-w-sm">
                           <div className="flex items-center gap-3">
-                            <img src={art.coverImage} alt="" className="w-14 h-11 object-cover bg-[#EEEBE6] shrink-0 border border-[#EEEBE6] rounded-xs" />
+                            <img src={getSafeImage(art.coverImage, DEFAULT_ARTICLE_IMAGE)} alt="" className="w-14 h-11 object-cover bg-[#EEEBE6] shrink-0 border border-[#EEEBE6] rounded-xs" />
                             <div className="min-w-0">
                               <h4 className="font-serif font-normal text-sm text-[#1A1A1A] line-clamp-1">{art.title}</h4>
                               <p className="text-[10px] text-[#888] font-mono truncate">{siteSettings.blogSlugPrefix || '/article/'}{art.slug}</p>
@@ -1105,7 +1118,7 @@ export const AdminCMS: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                 </tbody>
               </table>
             </div>
@@ -1425,7 +1438,7 @@ export const AdminCMS: React.FC = () => {
                         : 'border-[#DDD8D0] bg-[#FDFCFB] hover:border-neutral-400'
                     }`}
                   >
-                    {articleForm.coverImage ? (
+                    {articleForm.coverImage?.trim() ? (
                       <div className="space-y-2.5">
                         <div className="relative rounded overflow-hidden border border-[#E5E2DC] bg-neutral-900 group">
                           <img
@@ -1642,7 +1655,7 @@ export const AdminCMS: React.FC = () => {
                           className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-neutral-300 bg-neutral-100 cursor-pointer group flex items-center justify-center"
                           title="Klik untuk pilih file foto avatar"
                         >
-                          {articleForm.author.avatar ? (
+                          {articleForm.author.avatar?.trim() ? (
                             <img
                               src={articleForm.author.avatar}
                               alt={articleForm.author.name}
@@ -1990,7 +2003,7 @@ export const AdminCMS: React.FC = () => {
                     {block.type === 'image' && (
                       <div className="space-y-2 bg-white p-3 border border-[#EEEBE6]">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                          {block.imageUrl ? (
+                          {block.imageUrl?.trim() ? (
                             <img
                               src={block.imageUrl}
                               alt={block.imageCaption || 'Block illustration'}
@@ -2511,7 +2524,7 @@ export const AdminCMS: React.FC = () => {
                         <tr key={cam.id} className="hover:bg-[#FDFCFB] transition-colors">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <img src={cam.image} alt="" className="w-12 h-10 object-cover bg-[#EEEBE6] shrink-0 border border-[#EEEBE6]" />
+                              <img src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)} alt="" className="w-12 h-10 object-cover bg-[#EEEBE6] shrink-0 border border-[#EEEBE6]" />
                               <div>
                                 <h4 className="font-serif font-normal text-sm text-[#1A1A1A]">{cam.name}</h4>
                                 <span className="text-[10px] text-[#888]">{cam.specs.megapixels}MP</span>
@@ -2771,7 +2784,7 @@ export const AdminCMS: React.FC = () => {
                           : 'border-neutral-300 hover:border-neutral-900 bg-white'
                       }`}
                     >
-                      {cameraForm.image ? (
+                      {cameraForm.image?.trim() ? (
                         <>
                           <img
                             src={cameraForm.image}
@@ -3170,8 +3183,16 @@ export const AdminCMS: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EEEBE6]">
-                  {cameras.flatMap((cam) =>
-                    cam.affiliateLinks.map((link) => (
+                  {cameras.flatMap((cam) => cam.affiliateLinks || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-12 text-center text-[#888]">
+                        <Link2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="text-xs">No affiliate links found. Add cameras with retailer links in the Camera Catalog.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    cameras.flatMap((cam) =>
+                      (cam.affiliateLinks || []).map((link) => (
                       <tr key={link.id} className="hover:bg-[#FDFCFB] transition-colors">
                         <td className="p-4 font-serif font-normal text-[#1A1A1A]">{cam.name}</td>
                         <td className="p-4 font-medium text-[#666]">{link.retailer}</td>
@@ -3207,7 +3228,7 @@ export const AdminCMS: React.FC = () => {
                         </td>
                       </tr>
                     ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -3285,36 +3306,43 @@ export const AdminCMS: React.FC = () => {
             </form>
 
             {/* Media Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {mediaAssets.map((media) => (
-                <div key={media.id} className="bg-white border border-[#EEEBE6] overflow-hidden p-3 space-y-2">
-                  <div className="h-40 overflow-hidden bg-[#EEEBE6]">
-                    <img src={media.url} alt={media.title} className="w-full h-full object-cover" />
+            {mediaAssets.length === 0 ? (
+              <div className="bg-white border border-[#EEEBE6] p-12 text-center text-[#888]">
+                <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-xs">No media assets in library. Upload or add media URLs above.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {mediaAssets.map((media) => (
+                  <div key={media.id} className="bg-white border border-[#EEEBE6] overflow-hidden p-3 space-y-2">
+                    <div className="h-40 overflow-hidden bg-[#EEEBE6]">
+                      <img src={getSafeImage(media.url, DEFAULT_ARTICLE_IMAGE)} alt={media.title} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <h5 className="font-medium text-[#1A1A1A] truncate max-w-[150px]">{media.title}</h5>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard?.writeText(media.url);
+                          alert('Image URL copied to clipboard!');
+                        }}
+                        className="text-[10px] text-[#888] hover:text-black underline cursor-pointer"
+                      >
+                        Copy URL
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-[#888] pt-1 border-t border-[#EEEBE6]">
+                      <span>{media.dimensions}</span>
+                      <button
+                        onClick={() => deleteMediaAsset(media.id)}
+                        className="text-[#C62828] hover:underline cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <h5 className="font-medium text-[#1A1A1A] truncate max-w-[150px]">{media.title}</h5>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard?.writeText(media.url);
-                        alert('Image URL copied to clipboard!');
-                      }}
-                      className="text-[10px] text-[#888] hover:text-black underline cursor-pointer"
-                    >
-                      Copy URL
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-[#888] pt-1 border-t border-[#EEEBE6]">
-                    <span>{media.dimensions}</span>
-                    <button
-                      onClick={() => deleteMediaAsset(media.id)}
-                      className="text-[#C62828] hover:underline cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -3667,12 +3695,20 @@ export const AdminCMS: React.FC = () => {
           </div>
         )}
 
+        {/* TAB: SUPABASE CLOUD DATABASE & REALTIME DATA */}
+        {adminTab === 'supabase' && (
+          <div className="animate-in fade-in duration-200">
+            <SupabaseManager />
+          </div>
+        )}
+
         {/* TAB 10: EXTENSIBLE PLUGIN MANAGEMENT SYSTEM */}
         {adminTab === 'plugins' && (
           <div className="animate-in fade-in duration-200">
             <PluginManager />
           </div>
         )}
+
 
         {/* IN-APP DELETE CONFIRMATION MODAL */}
         {deleteModal && deleteModal.isOpen && (

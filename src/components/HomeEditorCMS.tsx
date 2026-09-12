@@ -8,6 +8,7 @@ import {
   SiteSettings, 
   MediaAsset 
 } from '../types';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 import { 
   Save, 
   Plus, 
@@ -372,7 +373,7 @@ export const HomeEditorCMS: React.FC<HomeEditorCMSProps> = ({
                       onClick={() => heroSlideFileInputRef.current?.click()}
                       className="md:col-span-1 aspect-[16/9] rounded-xl border-2 border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 overflow-hidden cursor-pointer relative group flex items-center justify-center"
                     >
-                      {currentSlide.image ? (
+                      {currentSlide.image?.trim() ? (
                         <>
                           <img
                             src={currentSlide.image}
@@ -619,7 +620,7 @@ export const HomeEditorCMS: React.FC<HomeEditorCMSProps> = ({
 
                   {/* Image Thumbnail */}
                   <div className="aspect-[16/10] rounded-lg bg-neutral-200 overflow-hidden relative group">
-                    <img src={card.image} alt={card.title} className="w-full h-full object-cover" />
+                    <img src={getSafeImage(card.image, DEFAULT_ARTICLE_IMAGE)} alt={card.title} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => {
@@ -785,7 +786,7 @@ export const HomeEditorCMS: React.FC<HomeEditorCMSProps> = ({
                       onChange={() => toggleFeaturedCamera(cam.id)}
                       className="rounded text-neutral-900 focus:ring-0"
                     />
-                    <img src={cam.image} alt={cam.name} className="w-10 h-10 object-contain bg-neutral-100 rounded p-1 shrink-0" />
+                    <img src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)} alt={cam.name} className="w-10 h-10 object-contain bg-neutral-100 rounded p-1 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 font-semibold text-xs truncate">
                         <span className="truncate">{cam.name}</span>

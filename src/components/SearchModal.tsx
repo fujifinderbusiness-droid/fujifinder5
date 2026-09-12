@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Search, X, Camera, BookOpen, Star, ArrowRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 export const SearchModal: React.FC = () => {
   const { 
@@ -139,7 +140,7 @@ export const SearchModal: React.FC = () => {
                     className="flex items-center gap-3 p-3 border border-[#EEEBE6] hover:border-black bg-white transition-all cursor-pointer group"
                   >
                     <img
-                      src={cam.image}
+                      src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)}
                       alt={cam.name}
                       className="w-12 h-12 object-cover bg-[#E5E2DD] shrink-0"
                     />
@@ -192,7 +193,7 @@ export const SearchModal: React.FC = () => {
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <img
-                        src={art.coverImage}
+                        src={getSafeImage(art.coverImage, DEFAULT_ARTICLE_IMAGE)}
                         alt={art.title}
                         className="w-14 h-12 object-cover bg-[#E5E2DD] shrink-0"
                       />

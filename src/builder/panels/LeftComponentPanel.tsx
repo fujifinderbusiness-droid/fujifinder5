@@ -637,7 +637,7 @@ export const LeftComponentPanel: React.FC = () => {
                     key={tpl.id}
                     className="border border-[#EEEBE6] bg-white p-3 space-y-2 hover:border-black transition-all"
                   >
-                    {tpl.thumbnailUrl && (
+                    {Boolean(tpl.thumbnailUrl?.trim()) && (
                       <div className="aspect-16/9 overflow-hidden bg-neutral-100">
                         <img src={tpl.thumbnailUrl} alt={tpl.title} className="w-full h-full object-cover" />
                       </div>

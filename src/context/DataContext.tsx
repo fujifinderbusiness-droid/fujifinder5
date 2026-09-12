@@ -379,7 +379,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const firstPart = parts[0].toLowerCase();
+      const firstPart = (parts[0] || '').toLowerCase();
 
       if (firstPart === articlePrefix || firstPart === 'article' || firstPart === 'journal') {
         if (parts.length >= 2) {
@@ -444,7 +444,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // -------------------------------------------------------------
 
   const saveArticle = async (article: Article): Promise<{ success: boolean; message: string }> => {
-    const cleanSlug = (article.slug || article.title)
+    const cleanSlug = (article.slug || article.title || '')
       .toLowerCase()
       .trim()
       .replace(/^\/+|\/+$/g, '')
@@ -505,11 +505,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getArticleBySlug = (slugOrId: string) => {
     if (!slugOrId) return undefined;
-    const clean = slugOrId.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const clean = (slugOrId || '').replace(/^\/+|\/+$/g, '').toLowerCase();
     return (
-      articles.find((a) => a.slug.toLowerCase() === clean) ||
+      articles.find((a) => (a.slug || '').toLowerCase() === clean) ||
       articles.find((a) => a.id === slugOrId) ||
-      articles.find((a) => a.slug.toLowerCase().replace(/[^a-z0-9]/g, '') === clean.replace(/[^a-z0-9]/g, ''))
+      articles.find((a) => (a.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '') === clean.replace(/[^a-z0-9]/g, ''))
     );
   };
 

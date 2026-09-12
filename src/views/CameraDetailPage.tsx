@@ -23,6 +23,7 @@ import { AffiliateDisclosureBanner } from '../components/AffiliateDisclosure';
 import { ComparisonTable } from '../components/ComparisonTable';
 import { ArticleCard } from '../components/ArticleCard';
 import { CameraCard } from '../components/CameraCard';
+import { DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 export const CameraDetailPage: React.FC = () => {
   const { activeSlug, cameras, articles, navigateTo, setComparedCameraIds, isAdminLoggedIn } = useData();
@@ -61,7 +62,10 @@ export const CameraDetailPage: React.FC = () => {
     );
   }
 
-  const allImages = [camera.image, ...(camera.secondaryImages || [])];
+  const rawImages = [camera.image, ...(camera.secondaryImages || [])]
+    .map((img) => (typeof img === 'string' ? img.trim() : ''))
+    .filter((img) => img.length > 0);
+  const allImages = rawImages.length > 0 ? rawImages : [DEFAULT_CAMERA_IMAGE];
   const relatedArticles = articles.filter((a) => a.status === 'published' && camera.relatedArticleSlugs?.includes(a.slug));
   const relatedCameras = cameras.filter((c) => (c.status ?? 'published') === 'published' && camera.relatedProductIds?.includes(c.id));
 
@@ -112,7 +116,7 @@ export const CameraDetailPage: React.FC = () => {
         <div className="lg:col-span-6 space-y-4">
           <div className="h-96 sm:h-[480px] w-full overflow-hidden bg-[#E5E2DD] border border-[#EEEBE6] relative">
             <img
-              src={allImages[activeImageIndex]}
+              src={getSafeImage(allImages[activeImageIndex], DEFAULT_CAMERA_IMAGE)}
               alt={camera.name}
               className="w-full h-full object-cover object-center transition-all duration-500"
             />
@@ -138,7 +142,7 @@ export const CameraDetailPage: React.FC = () => {
                     activeImageIndex === idx ? 'border-black' : 'border-[#EEEBE6] opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                  <img src={getSafeImage(img, DEFAULT_CAMERA_IMAGE)} alt="Thumbnail" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

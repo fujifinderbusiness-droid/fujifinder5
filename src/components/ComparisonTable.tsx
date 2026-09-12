@@ -3,6 +3,7 @@ import { Star, Check, X, ArrowUpRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { AffiliateButton } from './AffiliateButton';
 import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 interface ComparisonTableProps {
   productIds: string[];
@@ -41,7 +42,7 @@ export const ComparisonTable: React.FC<ComparisonTableProps> = ({ productIds, so
                 <th key={cam.id} className="p-4 min-w-[220px] border-r border-[#EEEBE6] last:border-r-0">
                   <div className="flex flex-col items-start gap-2">
                     <img
-                      src={cam.image}
+                      src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)}
                       alt={cam.name}
                       onClick={() => navigateTo('camera-detail', cam.slug)}
                       className="w-20 h-16 object-cover bg-[#E5E2DD] cursor-pointer hover:opacity-85 transition-opacity"

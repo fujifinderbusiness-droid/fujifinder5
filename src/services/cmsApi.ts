@@ -89,7 +89,7 @@ export function setCachedPublishedVersion(ver: number): void {
 /**
  * Standard fetch helper with authorization header injection and robust error formatting
  */
-async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function apiRequest<T>(url: string, options: RequestInit & { silent?: boolean } = {}): Promise<T> {
   const token = getAdminToken();
   const headers = new Headers(options.headers || {});
 
@@ -101,12 +101,16 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  const { silent, ...fetchOptions } = options;
+
   let res: Response;
   try {
-    res = await fetch(url, { ...options, headers });
+    res = await fetch(url, { ...fetchOptions, headers });
   } catch (netErr: any) {
-    console.error(`[CMS API] Network error for ${url}:`, netErr);
-    throw new Error('Changes could not be saved. Please try again.');
+    if (!silent) {
+      console.warn(`[CMS API] Fetch failed for ${url}:`, netErr?.message || netErr);
+    }
+    throw new Error('Connection error. Please check your network and try again.');
   }
 
   if (!res.ok) {
@@ -137,9 +141,17 @@ export async function fetchPublishedSiteData(): Promise<PublishedSiteResponse> {
 }
 
 export async function checkPublishedVersion(): Promise<{ published_version: number; published_at: string }> {
-  return apiRequest<{ published_version: number; published_at: string }>('/api/version', {
-    method: 'GET',
-  });
+  try {
+    return await apiRequest<{ published_version: number; published_at: string }>('/api/version', {
+      method: 'GET',
+      silent: true,
+    });
+  } catch {
+    return {
+      published_version: getCachedPublishedVersion(),
+      published_at: new Date().toISOString(),
+    };
+  }
 }
 
 export async function fetchPublishedPage(slug: string): Promise<BuilderPage | null> {

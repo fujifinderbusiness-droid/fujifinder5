@@ -8,8 +8,10 @@ import {
   EmailCampaign, 
   EmailLog 
 } from '../../src/types/newsletterTypes';
+import { supabaseService } from '../db/supabaseClient';
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'newsletter-data.json');
+
 
 export interface NewsletterStoreData {
   settings: EmailSettings;
@@ -130,103 +132,7 @@ const DEFAULT_TEMPLATES: EmailTemplate[] = [
   }
 ];
 
-const DEFAULT_SUBSCRIBERS: Subscriber[] = [
-  {
-    id: 'sub-1',
-    email: 'marcus.vance@creatorlab.io',
-    name: 'Marcus Vance',
-    status: 'active',
-    subscribed_at: '2026-08-14T09:30:00Z',
-    email_verified_at: '2026-08-14T09:31:00Z',
-    verification_token_hash: null,
-    verification_expires_at: null,
-    unsubscribed_at: null,
-    created_at: '2026-08-14T09:30:00Z',
-    updated_at: '2026-08-14T09:30:00Z',
-    welcome_email_sent_at: '2026-08-14T09:31:00Z',
-    double_opt_in_token: null,
-    unsubscribe_token: 'tok_mv_98234710293847',
-    source: 'landing_page',
-    verification_attempts: 1,
-    last_verification_sent_at: '2026-08-14T09:30:00Z',
-  },
-  {
-    id: 'sub-2',
-    email: 'elena.rostova@streetframes.net',
-    name: 'Elena Rostova',
-    status: 'active',
-    subscribed_at: '2026-08-22T14:15:00Z',
-    email_verified_at: '2026-08-22T14:16:00Z',
-    verification_token_hash: null,
-    verification_expires_at: null,
-    unsubscribed_at: null,
-    created_at: '2026-08-22T14:15:00Z',
-    updated_at: '2026-08-22T14:15:00Z',
-    welcome_email_sent_at: '2026-08-22T14:16:00Z',
-    double_opt_in_token: null,
-    unsubscribe_token: 'tok_er_57291834719283',
-    source: 'article_cta',
-    verification_attempts: 1,
-    last_verification_sent_at: '2026-08-22T14:15:00Z',
-  },
-  {
-    id: 'sub-3',
-    email: 'david.tanaka@tokyowalks.com',
-    name: 'David Tanaka',
-    status: 'active',
-    subscribed_at: '2026-09-01T11:00:00Z',
-    email_verified_at: '2026-09-01T11:01:00Z',
-    verification_token_hash: null,
-    verification_expires_at: null,
-    unsubscribed_at: null,
-    created_at: '2026-09-01T11:00:00Z',
-    updated_at: '2026-09-01T11:00:00Z',
-    welcome_email_sent_at: '2026-09-01T11:01:00Z',
-    double_opt_in_token: null,
-    unsubscribe_token: 'tok_dt_19283746591823',
-    source: 'footer',
-    verification_attempts: 1,
-    last_verification_sent_at: '2026-09-01T11:00:00Z',
-  },
-  {
-    id: 'sub-4',
-    email: 'sarah.miller.photo@gmail.com',
-    name: 'Sarah Miller',
-    status: 'pending',
-    subscribed_at: '2026-09-06T16:20:00Z',
-    email_verified_at: null,
-    verification_token_hash: 'd3b07384d113edec49eaa6238ad5ff00',
-    verification_expires_at: '2026-09-12T16:20:00Z',
-    unsubscribed_at: null,
-    created_at: '2026-09-06T16:20:00Z',
-    updated_at: '2026-09-06T16:20:00Z',
-    welcome_email_sent_at: null,
-    double_opt_in_token: 'optin_sm_482910293847',
-    unsubscribe_token: 'tok_sm_48291029384722',
-    source: 'landing_page',
-    verification_attempts: 1,
-    last_verification_sent_at: '2026-09-06T16:20:00Z',
-  },
-  {
-    id: 'sub-5',
-    email: 'alex.rivera.archive@yahoo.com',
-    name: 'Alex Rivera',
-    status: 'unsubscribed',
-    subscribed_at: '2026-07-10T12:00:00Z',
-    email_verified_at: '2026-07-10T12:01:00Z',
-    verification_token_hash: null,
-    verification_expires_at: null,
-    unsubscribed_at: '2026-08-30T18:45:00Z',
-    created_at: '2026-07-10T12:00:00Z',
-    updated_at: '2026-08-30T18:45:00Z',
-    welcome_email_sent_at: '2026-07-10T12:01:00Z',
-    double_opt_in_token: null,
-    unsubscribe_token: 'tok_ar_12093847561928',
-    source: 'footer',
-    verification_attempts: 1,
-    last_verification_sent_at: '2026-07-10T12:00:00Z',
-  }
-];
+const DEFAULT_SUBSCRIBERS: Subscriber[] = [];
 
 const DEFAULT_SETTINGS: EmailSettings = {
   activeProvider: 'resend',
@@ -244,80 +150,9 @@ const DEFAULT_SETTINGS: EmailSettings = {
   companyAddress: 'FujiFinder Media Group • Jakarta & Tokyo Independent Camera Testing Lab'
 };
 
-const DEFAULT_CAMPAIGNS: EmailCampaign[] = [
-  {
-    id: 'cmp-1',
-    name: 'September Field Test Roundup: X-T5 vs X-T50',
-    subject: 'Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?',
-    previewText: 'Head-to-head sensor benchmarks, dynamic range lab scorecards, and low-light street tests.',
-    fromName: 'FujiFinder Editorial',
-    replyTo: 'editorial@fujifinder.my.id',
-    content: 'Full analysis comparing the twin 40.2MP flagship sensors with lab scorecards.',
-    templateId: 'tpl-new-article',
-    audience: 'all_active',
-    provider: 'resend',
-    recipientCount: 3,
-    status: 'sent',
-    created_at: '2026-09-04T10:00:00Z',
-    sent_at: '2026-09-04T10:05:00Z',
-    metrics: {
-      sent: 3,
-      delivered: 3,
-      failed: 0,
-      opened: 2,
-      clicked: 1
-    }
-  }
-];
+const DEFAULT_CAMPAIGNS: EmailCampaign[] = [];
 
-const DEFAULT_LOGS: EmailLog[] = [
-  {
-    id: 'log-1',
-    campaignId: 'cmp-1',
-    recipient: 'marcus.vance@creatorlab.io',
-    subject: 'Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?',
-    emailType: 'marketing',
-    provider: 'resend',
-    status: 'delivered',
-    providerMessageId: 'res_msg_982341908234',
-    sent_at: '2026-09-04T10:05:12Z',
-    delivered_at: '2026-09-04T10:05:14Z'
-  },
-  {
-    id: 'log-2',
-    campaignId: 'cmp-1',
-    recipient: 'elena.rostova@streetframes.net',
-    subject: 'Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?',
-    emailType: 'marketing',
-    provider: 'resend',
-    status: 'delivered',
-    providerMessageId: 'res_msg_982341908235',
-    sent_at: '2026-09-04T10:05:15Z',
-    delivered_at: '2026-09-04T10:05:18Z'
-  },
-  {
-    id: 'log-3',
-    campaignId: 'cmp-1',
-    recipient: 'david.tanaka@tokyowalks.com',
-    subject: 'Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?',
-    emailType: 'marketing',
-    provider: 'resend',
-    status: 'delivered',
-    providerMessageId: 'res_msg_982341908236',
-    sent_at: '2026-09-04T10:05:18Z',
-    delivered_at: '2026-09-04T10:05:20Z'
-  },
-  {
-    id: 'log-4',
-    recipient: 'david.tanaka@tokyowalks.com',
-    subject: 'Welcome to the FujiFinder Editorial Dispatch',
-    emailType: 'welcome',
-    provider: 'resend',
-    status: 'sent',
-    providerMessageId: 'res_msg_welc_1928374',
-    sent_at: '2026-09-01T11:01:00Z'
-  }
-];
+const DEFAULT_LOGS: EmailLog[] = [];
 
 class NewsletterStore {
   private data: NewsletterStoreData;
@@ -446,6 +281,12 @@ class NewsletterStore {
 
     this.data.subscribers.unshift(newSubscriber);
     this.persistData();
+
+    // Synchronize new subscriber with Supabase subscribers table
+    supabaseService.saveSubscriber(newSubscriber).catch((err) => {
+      console.error('[NewsletterStore] Supabase saveSubscriber failed:', err);
+    });
+
     return newSubscriber;
   }
 
@@ -462,6 +303,12 @@ class NewsletterStore {
 
     this.data.subscribers[index] = updated;
     this.persistData();
+
+    // Synchronize subscriber update with Supabase
+    supabaseService.saveSubscriber(updated).catch((err) => {
+      console.error('[NewsletterStore] Supabase updateSubscriber failed:', err);
+    });
+
     return updated;
   }
 
@@ -473,6 +320,12 @@ class NewsletterStore {
     );
     if (this.data.subscribers.length !== initialLen) {
       this.persistData();
+
+      // Synchronize delete with Supabase
+      supabaseService.deleteSubscriber(idOrEmail).catch((err) => {
+        console.error('[NewsletterStore] Supabase deleteSubscriber failed:', err);
+      });
+
       return true;
     }
     return false;
@@ -487,6 +340,13 @@ class NewsletterStore {
     const deletedCount = initialLen - this.data.subscribers.length;
     if (deletedCount > 0) {
       this.persistData();
+
+      // Synchronize bulk deletes with Supabase
+      idsOrEmails.forEach((idOrEmail) => {
+        supabaseService.deleteSubscriber(idOrEmail).catch((err) => {
+          console.error('[NewsletterStore] Supabase bulk deleteSubscriber failed:', err);
+        });
+      });
     }
     return deletedCount;
   }
@@ -499,12 +359,17 @@ class NewsletterStore {
     this.data.subscribers = this.data.subscribers.map((sub) => {
       if (set.has(sub.id) && sub.status !== 'unsubscribed') {
         count++;
-        return {
+        const updatedSub: Subscriber = {
           ...sub,
           status: 'unsubscribed',
           unsubscribed_at: now,
           updated_at: now,
         };
+        // Update in Supabase
+        supabaseService.saveSubscriber(updatedSub).catch((err) => {
+          console.error('[NewsletterStore] Supabase bulkUnsubscribe sync failed:', err);
+        });
+        return updatedSub;
       }
       return sub;
     });
@@ -603,6 +468,12 @@ class NewsletterStore {
     };
     this.data.campaigns.unshift(newCmp);
     this.persistData();
+
+    // Synchronize campaign with Supabase email_campaigns table
+    supabaseService.saveEmailCampaign(newCmp).catch((err) => {
+      console.error('[NewsletterStore] Supabase saveEmailCampaign failed:', err);
+    });
+
     return newCmp;
   }
 
@@ -616,6 +487,12 @@ class NewsletterStore {
     };
     this.data.campaigns[index] = updated;
     this.persistData();
+
+    // Synchronize campaign update with Supabase
+    supabaseService.saveEmailCampaign(updated).catch((err) => {
+      console.error('[NewsletterStore] Supabase updateCampaign failed:', err);
+    });
+
     return updated;
   }
 
@@ -637,12 +514,45 @@ class NewsletterStore {
       this.data.logs = this.data.logs.slice(0, 500);
     }
     this.persistData();
+
+    // Synchronize email log with Supabase email_logs table
+    supabaseService.recordEmailLog(newLog).catch((err) => {
+      console.error('[NewsletterStore] Supabase recordEmailLog failed:', err);
+    });
+
     return newLog;
   }
 
   recordLog(log: Omit<EmailLog, 'id' | 'sent_at'> & { sent_at?: string }): EmailLog {
     return this.addLog(log);
   }
+
+  /**
+   * Load subscribers, campaigns, and logs directly from Supabase tables
+   */
+  public async initFromSupabase(): Promise<void> {
+    try {
+      const [subscribers, campaigns, logs] = await Promise.all([
+        supabaseService.getSubscribers(),
+        supabaseService.getEmailCampaigns(),
+        supabaseService.getEmailLogs(),
+      ]);
+
+      this.data.subscribers = subscribers;
+      if (campaigns.length > 0) {
+        this.data.campaigns = campaigns;
+      }
+      if (logs.length > 0) {
+        this.data.logs = logs;
+      }
+
+      this.persistData();
+      console.log(`[NewsletterStore] Initialized from Supabase: ${subscribers.length} subscribers, ${campaigns.length} campaigns, ${logs.length} logs`);
+    } catch (err: any) {
+      console.error('[NewsletterStore] Error initializing from Supabase:', err.message);
+    }
+  }
 }
 
 export const newsletterStore = new NewsletterStore();
+

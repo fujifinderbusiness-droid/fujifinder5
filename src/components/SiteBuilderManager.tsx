@@ -369,11 +369,13 @@ export const SiteBuilderManager: React.FC = () => {
               >
                 <div>
                   <div className="aspect-16/10 overflow-hidden bg-neutral-100 relative">
-                    <img
-                      src={tpl.thumbnailUrl}
-                      alt={tpl.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {tpl.thumbnailUrl ? (
+                      <img
+                        src={tpl.thumbnailUrl}
+                        alt={tpl.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : null}
                     <span className="absolute top-2.5 left-2.5 px-2 py-0.5 bg-black/80 text-white font-mono text-[9px] uppercase tracking-wider font-semibold">
                       {tpl.category}
                     </span>

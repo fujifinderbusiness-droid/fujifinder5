@@ -564,9 +564,9 @@ export const ArticleSEOEditor: React.FC<ArticleSEOEditorProps> = ({
               </label>
 
               <div className="aspect-[1.91/1] bg-[#FAF9F6] border border-[#DDD8D0] relative overflow-hidden flex items-center justify-center group">
-                {articleForm.seo?.ogImage || articleForm.coverImage ? (
+                {(articleForm.seo?.ogImage?.trim() || articleForm.coverImage?.trim()) ? (
                   <img
-                    src={articleForm.seo?.ogImage || articleForm.coverImage}
+                    src={(articleForm.seo?.ogImage?.trim() || articleForm.coverImage?.trim())!}
                     alt="Open Graph Preview"
                     className="w-full h-full object-cover"
                   />
@@ -835,9 +835,9 @@ export const ArticleSEOEditor: React.FC<ArticleSEOEditorProps> = ({
               <div className="max-w-md mx-auto border border-[#E0DCD6] overflow-hidden bg-white shadow-xs">
                 {/* Image */}
                 <div className="aspect-[1.91/1] bg-[#F5F3EF] overflow-hidden relative">
-                  {articleForm.seo?.ogImage || articleForm.coverImage ? (
+                  {(articleForm.seo?.ogImage?.trim() || articleForm.coverImage?.trim()) ? (
                     <img
-                      src={articleForm.seo?.ogImage || articleForm.coverImage}
+                      src={(articleForm.seo?.ogImage?.trim() || articleForm.coverImage?.trim())!}
                       alt="Social Card"
                       className="w-full h-full object-cover"
                     />

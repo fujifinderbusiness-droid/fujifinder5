@@ -5,6 +5,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import { ComparisonTable } from '../components/ComparisonTable';
 import { AffiliateDisclosureBanner } from '../components/AffiliateDisclosure';
 import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 export const ComparisonsPage: React.FC = () => {
   const { cameras, comparedCameraIds, setComparedCameraIds, navigateTo } = useData();
@@ -94,7 +95,7 @@ export const ComparisonsPage: React.FC = () => {
                 key={id}
                 className="flex items-center gap-2.5 px-3 py-1.5 bg-[#FDFCFB] border border-[#EEEBE6]"
               >
-                <img src={cam.image} alt={cam.name} className="w-6 h-6 object-cover bg-[#E5E2DD]" />
+                <img src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)} alt={cam.name} className="w-6 h-6 object-cover bg-[#E5E2DD]" />
                 <span className="text-xs font-semibold text-[#1A1A1A]">{cam.name}</span>
                 <button
                   onClick={() => handleRemoveCamera(id)}
@@ -139,7 +140,7 @@ export const ComparisonsPage: React.FC = () => {
                         : 'border-[#EEEBE6] hover:border-black bg-white cursor-pointer'
                     }`}
                   >
-                    <img src={c.image} alt={c.name} className="w-8 h-8 object-cover bg-[#E5E2DD]" />
+                    <img src={getSafeImage(c.image, DEFAULT_CAMERA_IMAGE)} alt={c.name} className="w-8 h-8 object-cover bg-[#E5E2DD]" />
                     <div className="min-w-0">
                       <div className="font-semibold text-[#1A1A1A] truncate">{c.name}</div>
                       <div className="text-[10px] text-[#888]">

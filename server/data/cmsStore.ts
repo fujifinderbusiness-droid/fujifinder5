@@ -31,8 +31,10 @@ import {
   DEFAULT_REUSABLE_SECTIONS,
   DEFAULT_LANDING_SECTIONS,
 } from '../../src/builder/defaultBuilderData';
+import { supabaseService } from '../db/supabaseClient';
 
 const CMS_DATA_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'cms-data.json');
+
 
 export interface CMSStoreData {
   version: number;
@@ -564,6 +566,12 @@ class CMSStore {
 
     this.bumpPublishedVersion();
     this.persistData(this.data);
+
+    // Asynchronously synchronize with Supabase articles table
+    supabaseService.saveArticle(article).catch((err) => {
+      console.error('[CMSStore] Background Supabase article sync failed:', err);
+    });
+
     return { article, published_version: this.data.version };
   }
 
@@ -571,6 +579,12 @@ class CMSStore {
     this.data.articles = this.data.articles.filter((a) => a.id !== id);
     this.bumpPublishedVersion();
     this.persistData(this.data);
+
+    // Synchronize delete with Supabase
+    supabaseService.deleteArticle(id).catch((err) => {
+      console.error('[CMSStore] Background Supabase article delete failed:', err);
+    });
+
     return { published_version: this.data.version };
   }
 
@@ -584,6 +598,12 @@ class CMSStore {
 
     this.bumpPublishedVersion();
     this.persistData(this.data);
+
+    // Asynchronously synchronize with Supabase cameras table
+    supabaseService.saveCamera(camera).catch((err) => {
+      console.error('[CMSStore] Background Supabase camera sync failed:', err);
+    });
+
     return { camera, published_version: this.data.version };
   }
 
@@ -591,6 +611,12 @@ class CMSStore {
     this.data.cameras = this.data.cameras.filter((c) => c.id !== id);
     this.bumpPublishedVersion();
     this.persistData(this.data);
+
+    // Synchronize delete with Supabase
+    supabaseService.deleteCamera(id).catch((err) => {
+      console.error('[CMSStore] Background Supabase camera delete failed:', err);
+    });
+
     return { published_version: this.data.version };
   }
 
@@ -612,6 +638,12 @@ class CMSStore {
     this.data.mediaAssets.unshift(asset);
     this.data.updated_at = new Date().toISOString();
     this.persistData(this.data);
+
+    // Synchronize with Supabase media_assets table
+    supabaseService.saveMediaAsset(asset).catch((err) => {
+      console.error('[CMSStore] Background Supabase media asset sync failed:', err);
+    });
+
     return asset;
   }
 
@@ -619,6 +651,11 @@ class CMSStore {
     this.data.mediaAssets = this.data.mediaAssets.filter((m) => m.id !== id);
     this.data.updated_at = new Date().toISOString();
     this.persistData(this.data);
+
+    // Synchronize delete with Supabase
+    supabaseService.deleteMediaAsset(id).catch((err) => {
+      console.error('[CMSStore] Background Supabase media asset delete failed:', err);
+    });
   }
 
   public recordAffiliateClick(click: AffiliateClickLog): void {
@@ -628,6 +665,38 @@ class CMSStore {
       this.data.affiliateClicks = this.data.affiliateClicks.slice(0, 500);
     }
     this.persistData(this.data);
+
+    // Record click in Supabase affiliate_clicks table
+    supabaseService.recordAffiliateClick(click).catch((err) => {
+      console.error('[CMSStore] Background Supabase affiliate click logging failed:', err);
+    });
+  }
+
+  /**
+   * Load data directly from Supabase tables into CMSStore memory & cache
+   */
+  public async initFromSupabase(): Promise<void> {
+    try {
+      const [cameras, articles, mediaAssets, affiliateClicks] = await Promise.all([
+        supabaseService.getCameras(),
+        supabaseService.getArticles(),
+        supabaseService.getMediaAssets(),
+        supabaseService.getAffiliateClicks(),
+      ]);
+
+      // Supabase is single source of truth for these tables
+      this.data.cameras = cameras;
+      this.data.articles = articles;
+      this.data.mediaAssets = mediaAssets;
+      if (affiliateClicks.length > 0) {
+        this.data.affiliateClicks = affiliateClicks;
+      }
+
+      this.persistData(this.data);
+      console.log(`[CMSStore] Successfully initialized from Supabase: ${cameras.length} cameras, ${articles.length} articles, ${mediaAssets.length} media assets`);
+    } catch (err: any) {
+      console.error('[CMSStore] Error initializing from Supabase:', err.message);
+    }
   }
 
   public resetToDemo(): { published_version: number } {

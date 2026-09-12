@@ -4,6 +4,7 @@ import { CameraProduct } from '../types';
 import { useData } from '../context/DataContext';
 import { AffiliateButton } from './AffiliateButton';
 import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 interface CameraCardProps {
   camera: CameraProduct;
@@ -14,6 +15,9 @@ interface CameraCardProps {
 export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid', sourceSlug }) => {
   const { navigateTo, toggleCompareCamera, comparedCameraIds } = useData();
   const isCompared = comparedCameraIds.includes(camera.id);
+  const primaryDeal = camera.affiliateLinks?.[0];
+  const effectivePrice = (primaryDeal?.price && primaryDeal.price > 0) ? primaryDeal.price : camera.price;
+  const effectiveCurrency = primaryDeal?.currency || 'IDR';
 
   if (layout === 'horizontal') {
     return (
@@ -24,7 +28,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
             className="w-full sm:w-44 h-36 overflow-hidden bg-[#E5E2DD] shrink-0 cursor-pointer relative"
           >
             <img
-              src={camera.image}
+              src={getSafeImage(camera.image, DEFAULT_CAMERA_IMAGE)}
               alt={camera.name}
               className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
@@ -69,9 +73,11 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
 
         <div className="w-full md:w-auto flex md:flex-col items-center md:items-end justify-between md:justify-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-[#EEEBE6] shrink-0">
           <div className="text-left md:text-right">
-            <div className="text-[10px] uppercase tracking-widest text-[#888]">Starting Price</div>
-            <div className="font-serif text-xl font-light text-[#1A1A1A]">
-              {formatCurrencyPrice(camera.price, camera.affiliateLinks?.[0]?.currency || 'IDR')}
+            <div className="text-[10px] uppercase tracking-widest text-[#888]">
+              {primaryDeal?.retailer ? `Harga di ${primaryDeal.retailer}` : 'Starting Price'}
+            </div>
+            <div className="font-serif text-xl font-bold text-[#1A1A1A]">
+              {formatCurrencyPrice(effectivePrice, effectiveCurrency)}
             </div>
           </div>
 
@@ -84,11 +90,10 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
             </button>
             <AffiliateButton
               productId={camera.id}
+              retailerLink={primaryDeal}
               sourceType="landing_card"
               sourceSlug={sourceSlug}
               size="sm"
-              customText="Checkout"
-              showRetailer={false}
             />
           </div>
         </div>
@@ -108,7 +113,7 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
         className="h-56 w-full overflow-hidden bg-[#E5E2DD] relative cursor-pointer"
       >
         <img
-          src={camera.image}
+          src={getSafeImage(camera.image, DEFAULT_CAMERA_IMAGE)}
           alt={camera.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
@@ -188,9 +193,11 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
         {/* Pricing & CTA Buttons */}
         <div className="mt-6 pt-4 border-t border-[#EEEBE6] flex items-center justify-between gap-2">
           <div>
-            <span className="block text-[9px] uppercase tracking-widest text-[#888]">Starting At</span>
-            <span className="font-serif text-lg font-light text-[#1A1A1A]">
-              {formatCurrencyPrice(camera.price, camera.affiliateLinks?.[0]?.currency || 'IDR')}
+            <span className="block text-[9px] uppercase tracking-widest text-[#888]">
+              {primaryDeal?.retailer ? `Harga di ${primaryDeal.retailer}` : 'Starting At'}
+            </span>
+            <span className="font-serif text-lg font-bold text-[#1A1A1A]">
+              {formatCurrencyPrice(effectivePrice, effectiveCurrency)}
             </span>
           </div>
 
@@ -203,11 +210,10 @@ export const CameraCard: React.FC<CameraCardProps> = ({ camera, layout = 'grid',
             </button>
             <AffiliateButton
               productId={camera.id}
+              retailerLink={primaryDeal}
               sourceType="landing_card"
               sourceSlug={sourceSlug}
               size="sm"
-              customText="Checkout"
-              showRetailer={false}
             />
           </div>
         </div>

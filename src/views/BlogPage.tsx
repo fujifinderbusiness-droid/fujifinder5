@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext';
 import { ArticleCategory } from '../types';
 import { ArticleCard } from '../components/ArticleCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_AVATAR_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 export const BlogPage: React.FC = () => {
   const { articles, selectedCategory, setSelectedCategory, navigateTo } = useData();
@@ -107,7 +108,7 @@ export const BlogPage: React.FC = () => {
         >
           <div className="lg:col-span-7 h-72 sm:h-96 lg:h-[440px] overflow-hidden bg-[#E5E2DD] relative">
             <img
-              src={featuredArticle.coverImage}
+              src={getSafeImage(featuredArticle.coverImage, DEFAULT_ARTICLE_IMAGE)}
               alt={featuredArticle.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
@@ -139,13 +140,13 @@ export const BlogPage: React.FC = () => {
             <div className="pt-6 mt-6 border-t border-[#EEEBE6] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <img
-                  src={featuredArticle.author.avatar}
-                  alt={featuredArticle.author.name}
+                  src={getSafeImage(featuredArticle.author?.avatar, DEFAULT_AVATAR_IMAGE)}
+                  alt={featuredArticle.author?.name || 'Author'}
                   className="w-8 h-8 object-cover border border-[#EEEBE6]"
                 />
                 <div>
-                  <div className="text-xs font-semibold text-[#1A1A1A]">{featuredArticle.author.name}</div>
-                  <div className="text-[10px] text-[#888]">{featuredArticle.author.role}</div>
+                  <div className="text-xs font-semibold text-[#1A1A1A]">{featuredArticle.author?.name}</div>
+                  <div className="text-[10px] text-[#888]">{featuredArticle.author?.role}</div>
                 </div>
               </div>
 

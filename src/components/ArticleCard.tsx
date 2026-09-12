@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, Calendar, ArrowRight, User } from 'lucide-react';
 import { Article } from '../types';
 import { useData } from '../context/DataContext';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_AVATAR_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 interface ArticleCardProps {
   article: Article;
@@ -21,7 +22,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, featured = fa
       >
         <div className="w-full sm:w-56 h-44 overflow-hidden bg-[#E5E2DD] shrink-0 relative">
           <img
-            src={article.coverImage}
+            src={getSafeImage(article.coverImage, DEFAULT_ARTICLE_IMAGE)}
             alt={article.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
@@ -54,11 +55,11 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, featured = fa
           <div className="flex items-center justify-between pt-3 mt-3 border-t border-[#EEEBE6] text-xs">
             <div className="flex items-center gap-2">
               <img
-                src={article.author.avatar}
-                alt={article.author.name}
+                src={getSafeImage(article.author?.avatar, DEFAULT_AVATAR_IMAGE)}
+                alt={article.author?.name || 'Author'}
                 className="w-5 h-5 object-cover border border-[#EEEBE6]"
               />
-              <span className="text-[#666] text-xs font-medium">{article.author.name}</span>
+              <span className="text-[#666] text-xs font-medium">{article.author?.name}</span>
             </div>
 
             <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-widest text-[#1A1A1A] font-semibold group-hover:translate-x-1 transition-transform">
@@ -79,7 +80,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, featured = fa
     >
       <div className="h-52 w-full overflow-hidden bg-[#E5E2DD] relative">
         <img
-          src={article.coverImage}
+          src={getSafeImage(article.coverImage, DEFAULT_ARTICLE_IMAGE)}
           alt={article.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
@@ -114,11 +115,11 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, featured = fa
         <div className="flex items-center justify-between pt-4 mt-4 border-t border-[#EEEBE6] text-xs">
           <div className="flex items-center gap-2">
             <img
-              src={article.author.avatar}
-              alt={article.author.name}
+              src={getSafeImage(article.author?.avatar, DEFAULT_AVATAR_IMAGE)}
+              alt={article.author?.name || 'Author'}
               className="w-6 h-6 object-cover border border-[#EEEBE6]"
             />
-            <span className="text-[#666] text-xs font-medium truncate max-w-[130px]">{article.author.name}</span>
+            <span className="text-[#666] text-xs font-medium truncate max-w-[130px]">{article.author?.name}</span>
           </div>
 
           <span className="text-[#1A1A1A] text-[11px] uppercase tracking-widest font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">

@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { AffiliateButton } from '../../components/AffiliateButton';
 import { subscribePublic } from '../../services/newsletterApi';
+import { formatCurrencyPrice } from '../../utils/currency';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_AVATAR_IMAGE, DEFAULT_CAMERA_IMAGE, getSafeImage } from '../../utils/imageUtils';
 
 interface BuilderWidgetRendererProps {
   block: BuilderBlock;
@@ -317,7 +319,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
             >
               <div className="relative aspect-16/10 overflow-hidden bg-[#EAE8E4]">
                 <img
-                  src={art.coverImage}
+                  src={getSafeImage(art.coverImage, DEFAULT_ARTICLE_IMAGE)}
                   alt={art.title}
                   className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                 />
@@ -359,7 +361,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       {typeof art.author === 'object' && art.author?.avatar && (
                         <img
-                          src={art.author.avatar}
+                          src={getSafeImage(art.author.avatar, DEFAULT_AVATAR_IMAGE)}
                           alt=""
                           className="w-4 h-4 rounded-full object-cover shrink-0"
                         />
@@ -407,7 +409,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               <div className="flex items-center gap-3.5 overflow-hidden">
                 {content.showThumbnails !== false && (
                   <img
-                    src={art.coverImage}
+                    src={getSafeImage(art.coverImage, DEFAULT_ARTICLE_IMAGE)}
                     alt={art.title}
                     className="w-16 h-12 object-cover shrink-0 border border-[#EEEBE6]"
                   />
@@ -455,6 +457,13 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
         <div className={`grid ${colClass} gap-6`}>
           {displayCameras.map((cam) => {
             const lowestAff = cam.affiliateLinks?.[0];
+            const displayPrice = lowestAff?.price || cam.price;
+            const displayCurrency = lowestAff?.currency || 'IDR';
+            const displayImage = cam.image || (cam as any).featuredImage;
+            const displayRating = cam.rating ?? (cam as any).overallScore;
+            const displayBadge = cam.bestForBadge || (cam as any).badge;
+            const displayDesc = cam.shortDescription || cam.idealUseCase || (cam as any).tagline;
+
             return (
               <div
                 key={cam.id}
@@ -466,19 +475,19 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
                     className="relative aspect-4/3 bg-[#FAF9F6] p-4 flex items-center justify-center cursor-pointer group"
                   >
                     <img
-                      src={cam.featuredImage}
+                      src={getSafeImage(displayImage, DEFAULT_CAMERA_IMAGE)}
                       alt={cam.name}
                       className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
-                    {cam.badge && (
+                    {displayBadge && (
                       <span className="absolute top-3 left-3 px-2 py-0.5 bg-black text-white text-[9px] font-semibold uppercase tracking-wider">
-                        {cam.badge}
+                        {displayBadge}
                       </span>
                     )}
-                    {content.showScores !== false && (
+                    {content.showScores !== false && displayRating !== undefined && (
                       <span className="absolute top-3 right-3 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-mono font-bold flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-white" />
-                        {cam.overallScore}
+                        {typeof displayRating === 'number' ? displayRating.toFixed(1) : displayRating}
                       </span>
                     )}
                   </div>
@@ -494,15 +503,22 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
                       {cam.name}
                     </h4>
                     <p className="text-xs text-[#666] line-clamp-2 leading-relaxed">
-                      {cam.tagline}
+                      {displayDesc}
                     </p>
 
                     <div className="pt-2 flex items-center justify-between text-xs">
-                      <span className="font-mono font-bold text-sm text-[#1A1A1A]">
-                        ${cam.priceEstimate?.toLocaleString()}
-                      </span>
+                      <div>
+                        <span className="font-serif font-bold text-sm text-[#1A1A1A]">
+                          {formatCurrencyPrice(displayPrice, displayCurrency)}
+                        </span>
+                        {lowestAff?.retailer && (
+                          <span className="block text-[9px] text-[#888]">
+                            via {lowestAff.retailer}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-[#888] font-mono">
-                        {cam.specs.sensorFormat}
+                        {cam.specs?.sensorFormat || cam.brand}
                       </span>
                     </div>
                   </div>
@@ -511,11 +527,8 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
                 <div className="p-4 pt-0 space-y-2">
                   {content.showAffiliateBtn !== false && lowestAff && (
                     <AffiliateButton
-                      url={lowestAff.url}
-                      retailer={lowestAff.retailer}
-                      price={lowestAff.price}
-                      currency={lowestAff.currency}
                       productId={cam.id}
+                      retailerLink={lowestAff}
                       sourceType="landing_card"
                       className="w-full text-center"
                     />
@@ -546,13 +559,19 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
     const topCam = publishedCams[0] || null;
     if (!topCam) return null;
 
+    const topAff = topCam.affiliateLinks?.[0];
+    const topPrice = topAff?.price || topCam.price;
+    const topCurrency = topAff?.currency || 'IDR';
+    const topImage = topCam.image || (topCam as any).featuredImage;
+    const topRating = topCam.rating ?? (topCam as any).overallScore;
+
     return (
       <div style={containerStyle} className={maxWidthClass}>
         <div className="bg-[#FAF9F6] border border-[#EEEBE6] p-6 md:p-8">
           <div className="flex flex-col md:flex-row gap-8 items-center">
             <div className="w-full md:w-1/3 aspect-4/3 bg-white border border-[#EEEBE6] p-6 flex items-center justify-center">
               <img
-                src={topCam.featuredImage}
+                src={getSafeImage(topImage, DEFAULT_CAMERA_IMAGE)}
                 alt={topCam.name}
                 className="max-h-48 max-w-full object-contain"
               />
@@ -565,7 +584,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
                   Editor's Gold Choice 2026
                 </span>
                 <span className="text-xs font-mono text-emerald-700 font-bold">
-                  Skor Lab: {topCam.overallScore}/100
+                  Skor Lab: {topRating}/10
                 </span>
               </div>
 
@@ -574,10 +593,19 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               </h3>
 
               <p className="text-xs md:text-sm text-[#555] leading-relaxed font-light">
-                {topCam.editorialVerdict || topCam.tagline}
+                {topCam.editorialOverview || topCam.shortDescription || (topCam as any).tagline}
               </p>
 
-              {content.showProsCons !== false && (
+              <div className="font-serif text-lg font-bold text-[#1A1A1A]">
+                {formatCurrencyPrice(topPrice, topCurrency)}
+                {topAff?.retailer && (
+                  <span className="ml-2 text-xs font-sans font-normal text-emerald-700">
+                    (Resmi di {topAff.retailer})
+                  </span>
+                )}
+              </div>
+
+              {content.showProsCons !== false && topCam.pros && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-2">
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-emerald-700">Kelebihan</span>
@@ -601,13 +629,10 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               )}
 
               <div className="pt-3 flex flex-wrap items-center gap-3">
-                {topCam.affiliateLinks?.[0] && (
+                {topAff && (
                   <AffiliateButton
-                    url={topCam.affiliateLinks[0].url}
-                    retailer={topCam.affiliateLinks[0].retailer}
-                    price={topCam.affiliateLinks[0].price}
-                    currency={topCam.affiliateLinks[0].currency}
                     productId={topCam.id}
+                    retailerLink={topAff}
                     sourceType="product_page"
                   />
                 )}
@@ -632,6 +657,9 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
     const camA = publishedCams[0] || null;
     const camB = publishedCams[1] || null;
 
+    const affA = camA?.affiliateLinks?.[0];
+    const affB = camB?.affiliateLinks?.[0];
+
     return (
       <div style={containerStyle} className={maxWidthClass}>
         <div className="bg-white border border-[#EEEBE6] p-6 space-y-6">
@@ -649,10 +677,12 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               {/* Camera A */}
               <div className="border border-[#EEEBE6] p-4 text-center space-y-3 bg-[#FAF9F6]">
                 <div className="h-36 flex items-center justify-center">
-                  <img src={camA.featuredImage} alt={camA.name} className="max-h-full max-w-full object-contain" />
+                  <img src={getSafeImage(camA.image || (camA as any).featuredImage, DEFAULT_CAMERA_IMAGE)} alt={camA.name} className="max-h-full max-w-full object-contain" />
                 </div>
                 <h4 className="font-serif font-semibold text-base text-[#1A1A1A]">{camA.name}</h4>
-                <div className="text-xs font-mono text-[#C62828] font-bold">${camA.priceEstimate}</div>
+                <div className="text-xs font-serif text-[#C62828] font-bold">
+                  {formatCurrencyPrice(affA?.price || camA.price, affA?.currency || 'IDR')}
+                </div>
                 <div className="text-[11px] text-[#555] space-y-1 pt-2 border-t border-[#DDD]">
                   <div><strong>Sensor:</strong> {camA.specs.sensor}</div>
                   <div><strong>Video:</strong> {camA.specs.videoSpecs}</div>
@@ -663,10 +693,12 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               {/* Camera B */}
               <div className="border border-[#EEEBE6] p-4 text-center space-y-3 bg-[#FAF9F6]">
                 <div className="h-36 flex items-center justify-center">
-                  <img src={camB.featuredImage} alt={camB.name} className="max-h-full max-w-full object-contain" />
+                  <img src={getSafeImage(camB.image || (camB as any).featuredImage, DEFAULT_CAMERA_IMAGE)} alt={camB.name} className="max-h-full max-w-full object-contain" />
                 </div>
                 <h4 className="font-serif font-semibold text-base text-[#1A1A1A]">{camB.name}</h4>
-                <div className="text-xs font-mono text-[#C62828] font-bold">${camB.priceEstimate}</div>
+                <div className="text-xs font-serif text-[#C62828] font-bold">
+                  {formatCurrencyPrice(affB?.price || camB.price, affB?.currency || 'IDR')}
+                </div>
                 <div className="text-[11px] text-[#555] space-y-1 pt-2 border-t border-[#DDD]">
                   <div><strong>Sensor:</strong> {camB.specs.sensor}</div>
                   <div><strong>Video:</strong> {camB.specs.videoSpecs}</div>
@@ -758,7 +790,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
               className="relative aspect-4/3 group overflow-hidden border border-[#EEEBE6] cursor-pointer"
             >
               <img
-                src={cat.img}
+                src={getSafeImage(cat.img, DEFAULT_ARTICLE_IMAGE)}
                 alt={cat.name}
                 className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
               />
@@ -950,7 +982,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
         <figure className="space-y-2">
           <div className="overflow-hidden border border-[#EEEBE6] bg-[#FAF9F6]">
             <img
-              src={content.url || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80'}
+              src={getSafeImage(content.url, DEFAULT_ARTICLE_IMAGE)}
               alt={content.caption || 'Foto'}
               className="w-full h-auto object-cover"
             />
@@ -1070,7 +1102,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
       <div style={containerStyle} className={maxWidthClass}>
         <div className="bg-[#FAF9F6] border border-[#EEEBE6] p-6 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
           <img
-            src={content.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+            src={getSafeImage(content.avatar, DEFAULT_AVATAR_IMAGE)}
             alt={content.name || 'Author'}
             className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-xs shrink-0"
           />
@@ -1242,7 +1274,7 @@ export const BuilderWidgetRenderer: React.FC<BuilderWidgetRendererProps> = ({
 
             <div className="relative aspect-16/9 bg-[#111] overflow-hidden border border-[#EEEBE6]">
               <img
-                src={activeSim === 'A' ? content.imageA || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80' : content.imageB || 'https://images.unsplash.com/photo-1502982720700-bfff97f2ecac?auto=format&fit=crop&w=1200&q=80'}
+                src={getSafeImage(activeSim === 'A' ? content.imageA : content.imageB, DEFAULT_ARTICLE_IMAGE)}
                 alt="Film Simulation Preview"
                 className="w-full h-full object-cover transition-opacity duration-300"
               />

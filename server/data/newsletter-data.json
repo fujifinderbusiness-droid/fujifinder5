@@ -20,12 +20,12 @@
       "email": "yunzilinza@gmail.com",
       "status": "active",
       "subscribed_at": "2026-09-09T00:20:29.915Z",
-      "email_verified_at": "2026-09-09T00:20:29.915Z",
+      "email_verified_at": "2026-09-09T00:20:29.915+00:00",
       "verification_token_hash": null,
       "verification_expires_at": null,
       "unsubscribed_at": null,
-      "created_at": "2026-09-09T00:20:29.915Z",
-      "updated_at": "2026-09-09T00:20:29.915Z",
+      "created_at": "2026-09-11T07:33:48.754594+00:00",
+      "updated_at": "2026-09-12T07:38:47.797575+00:00",
       "welcome_email_sent_at": null,
       "double_opt_in_token": null,
       "unsubscribe_token": "unsub_1116d86eac407fd0ea2de58c51666b46",
@@ -90,85 +90,38 @@
   ],
   "campaigns": [
     {
-      "id": "cmp-1",
-      "name": "September Field Test Roundup: X-T5 vs X-T50",
-      "subject": "Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?",
-      "previewText": "Head-to-head sensor benchmarks, dynamic range lab scorecards, and low-light street tests.",
+      "id": "camp_live_test",
+      "name": "Live Test Campaign",
+      "subject": "Fujifilm New Releases",
+      "previewText": "Check out the new cameras",
       "fromName": "FujiFinder Editorial",
       "replyTo": "editorial@fujifinder.my.id",
-      "content": "Full analysis comparing the twin 40.2MP flagship sensors with lab scorecards.",
-      "templateId": "tpl-new-article",
+      "content": "<h1>Welcome</h1><p>Here are the latest test reviews.</p>",
       "audience": "all_active",
       "provider": "resend",
-      "recipientCount": 3,
+      "recipientCount": 1,
       "status": "sent",
-      "created_at": "2026-09-04T10:00:00Z",
-      "sent_at": "2026-09-04T10:05:00Z",
+      "created_at": "2026-09-12T07:42:11.606+00:00",
+      "sent_at": "2026-09-12T07:42:11.606+00:00",
       "metrics": {
-        "sent": 3,
-        "delivered": 3,
+        "sent": 1,
+        "delivered": 1,
         "failed": 0,
-        "opened": 2,
-        "clicked": 1
+        "opened": 1,
+        "clicked": 0
       }
     }
   ],
   "logs": [
     {
-      "recipient": "yunzilinza@gmail.com",
-      "subject": "Welcome to the FujiFinder Editorial Dispatch",
-      "emailType": "welcome",
-      "provider": "resend",
-      "status": "failed",
-      "errorMessage": "Resend API key is not configured. Email could not be dispatched.",
-      "sent_at": "2026-09-09T00:20:29.918Z",
-      "id": "log_42ac21f37c6ee31f"
-    },
-    {
-      "id": "log-1",
-      "campaignId": "cmp-1",
-      "recipient": "marcus.vance@creatorlab.io",
-      "subject": "Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?",
+      "id": "log_142ea1bb975f2093",
+      "campaignId": "camp_live_test",
+      "recipient": "fujifinderbusiness@gmail.com",
+      "subject": "Fujifilm New Releases",
       "emailType": "marketing",
       "provider": "resend",
       "status": "delivered",
-      "providerMessageId": "res_msg_982341908234",
-      "sent_at": "2026-09-04T10:05:12Z",
-      "delivered_at": "2026-09-04T10:05:14Z"
-    },
-    {
-      "id": "log-2",
-      "campaignId": "cmp-1",
-      "recipient": "elena.rostova@streetframes.net",
-      "subject": "Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?",
-      "emailType": "marketing",
-      "provider": "resend",
-      "status": "delivered",
-      "providerMessageId": "res_msg_982341908235",
-      "sent_at": "2026-09-04T10:05:15Z",
-      "delivered_at": "2026-09-04T10:05:18Z"
-    },
-    {
-      "id": "log-3",
-      "campaignId": "cmp-1",
-      "recipient": "david.tanaka@tokyowalks.com",
-      "subject": "Fujifilm X-T5 vs X-T50: Which 40MP Hybrid Should You Choose?",
-      "emailType": "marketing",
-      "provider": "resend",
-      "status": "delivered",
-      "providerMessageId": "res_msg_982341908236",
-      "sent_at": "2026-09-04T10:05:18Z",
-      "delivered_at": "2026-09-04T10:05:20Z"
-    },
-    {
-      "id": "log-4",
-      "recipient": "david.tanaka@tokyowalks.com",
-      "subject": "Welcome to the FujiFinder Editorial Dispatch",
-      "emailType": "welcome",
-      "provider": "resend",
-      "status": "sent",
-      "providerMessageId": "res_msg_welc_1928374",
-      "sent_at": "2026-09-01T11:01:00Z"
+      "sent_at": "2026-09-12T07:42:11.817+00:00"
     }
   ]
 }

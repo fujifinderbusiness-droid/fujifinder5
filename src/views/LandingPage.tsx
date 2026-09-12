@@ -27,6 +27,8 @@ import { AffiliateButton } from '../components/AffiliateButton';
 import { useSiteBuilder } from '../builder/BuilderContext';
 import { BuilderPageRenderer } from '../builder/renderers/BuilderPageRenderer';
 import { NewsletterSubscribeBox } from '../components/NewsletterSubscribeBox';
+import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 interface HeroSlide {
   badge: string;
@@ -109,7 +111,7 @@ export const LandingPage: React.FC = () => {
         : art.title,
       subtitle: art.subtitle || 'FujiFinder Editorial Journal',
       description: art.excerpt,
-      image: art.coverImage,
+      image: getSafeImage(art.coverImage, DEFAULT_ARTICLE_IMAGE),
       storySlug: art.slug,
       primaryCtaText: 'Read Story',
       secondaryCtaText: 'Katalog Review & Uji Lab',
@@ -274,7 +276,7 @@ export const LandingPage: React.FC = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src={currentHero.image}
+            src={getSafeImage(currentHero.image, DEFAULT_ARTICLE_IMAGE)}
             alt={currentHero.headline}
             className="w-full h-full object-cover object-center transition-all duration-700 filter brightness-[0.85]"
           />
@@ -309,11 +311,17 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               id="hero-read-story-btn"
-              onClick={() => navigateTo('article-detail', currentHero.storySlug)}
+              onClick={() => {
+                if (currentHero.storySlug && articles.some((a) => a.slug === currentHero.storySlug)) {
+                  navigateTo('article-detail', currentHero.storySlug);
+                } else {
+                  navigateTo('cameras');
+                }
+              }}
               className="bg-white text-black hover:bg-white/90 px-6 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer flex items-center gap-2 shadow-sm active:scale-95"
             >
               <BookOpen className="w-4 h-4 text-black" />
-              <span>{currentHero.primaryCtaText}</span>
+              <span>{articles.length > 0 ? currentHero.primaryCtaText : 'Jelajahi Katalog Kamera'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
@@ -393,7 +401,7 @@ export const LandingPage: React.FC = () => {
               {/* Background Photo */}
               <div className="absolute inset-0 z-0">
                 <img
-                  src={cat.image}
+                  src={getSafeImage(cat.image, DEFAULT_ARTICLE_IMAGE)}
                   alt={cat.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
@@ -483,7 +491,7 @@ export const LandingPage: React.FC = () => {
             {/* Background Image */}
             <div className="absolute inset-0 z-0">
               <img
-                src={featuredGuideArticle.coverImage}
+                src={getSafeImage(featuredGuideArticle.coverImage, DEFAULT_ARTICLE_IMAGE)}
                 alt={featuredGuideArticle.title}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />
@@ -557,8 +565,13 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* 6 Editorial Review Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {reviewedCameras.map((cam) => (
+        {reviewedCameras.length === 0 ? (
+          <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center text-neutral-500 text-xs">
+            Belum ada ulasan kamera di katalog saat ini.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reviewedCameras.map((cam) => (
             <div
               key={cam.id}
               className="bg-white border border-neutral-200 rounded-2xl p-5 flex flex-col justify-between hover:border-neutral-400 hover:shadow-md transition-all duration-200 group text-left"
@@ -582,7 +595,7 @@ export const LandingPage: React.FC = () => {
                   className="w-full h-44 bg-[#F8F7F5] rounded-xl flex items-center justify-center p-3 mb-4 overflow-hidden relative cursor-pointer group-hover:bg-[#F3F2EE] transition-colors"
                 >
                   <img
-                    src={cam.image}
+                    src={getSafeImage(cam.image, DEFAULT_CAMERA_IMAGE)}
                     alt={cam.name}
                     className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
                   />
@@ -617,11 +630,35 @@ export const LandingPage: React.FC = () => {
                   <p className="text-xs text-neutral-600 line-clamp-2 italic leading-relaxed pt-1 border-t border-neutral-100">
                     "{cam.verdict || 'Performa sensor solid dengan reproduksi warna khas dan sistem autofokus responsif untuk segala kondisi pemotretan.'}"
                   </p>
+
+                  {/* Price and Retailer */}
+                  {(() => {
+                    const primaryAff = cam.affiliateLinks?.[0];
+                    const effectivePrice = primaryAff?.price || cam.price;
+                    const effectiveCurrency = primaryAff?.currency || 'IDR';
+                    return (
+                      <div className="pt-2 flex items-baseline justify-between border-t border-neutral-100">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium block">
+                            Harga Retail Resmi
+                          </span>
+                          <span className="font-serif text-base font-bold text-neutral-900">
+                            {formatCurrencyPrice(effectivePrice, effectiveCurrency)}
+                          </span>
+                        </div>
+                        {primaryAff?.retailer && (
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {primaryAff.retailer}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
               {/* Action Buttons: Read Review & Checkout (Mitra Affiliate) */}
-              <div className="pt-4 mt-3 border-t border-neutral-100 flex items-center gap-2">
+              <div className="pt-3 mt-3 border-t border-neutral-100 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => navigateTo('camera-detail', cam.slug)}
@@ -634,10 +671,9 @@ export const LandingPage: React.FC = () => {
                 <div className="flex-1">
                   <AffiliateButton
                     productId={cam.id}
+                    retailerLink={cam.affiliateLinks?.[0]}
                     sourceType="landing_card"
                     size="sm"
-                    customText="Checkout"
-                    showRetailer={false}
                     className="rounded-xl w-full py-2.5 text-center text-xs"
                   />
                 </div>
@@ -657,6 +693,7 @@ export const LandingPage: React.FC = () => {
             </div>
           ))}
         </div>
+        )}
 
         {/* Editorial Transparency Note */}
         <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-neutral-600">

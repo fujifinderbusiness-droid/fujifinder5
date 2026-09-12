@@ -3,6 +3,7 @@ import { Star, CheckCircle2, XCircle, Award, ArrowUpRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { AffiliateButton } from './AffiliateButton';
 import { formatCurrencyPrice } from '../utils/currency';
+import { DEFAULT_CAMERA_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 interface DynamicProductBoxProps {
   productId: string;
@@ -60,7 +61,7 @@ export const DynamicProductBox: React.FC<DynamicProductBoxProps> = ({
           className="md:col-span-4 h-48 sm:h-52 overflow-hidden bg-[#E5E2DD] cursor-pointer group relative"
         >
           <img
-            src={camera.image}
+            src={getSafeImage(camera.image, DEFAULT_CAMERA_IMAGE)}
             alt={camera.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />

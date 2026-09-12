@@ -3,6 +3,21 @@
  * them for browser preview and localStorage persistence.
  */
 
+export const DEFAULT_CAMERA_IMAGE = 'https://images.unsplash.com/photo-1510127031490-569779437d68?auto=format&fit=crop&w=1200&q=80';
+export const DEFAULT_ARTICLE_IMAGE = 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80';
+export const DEFAULT_AVATAR_IMAGE = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
+/**
+ * Ensures an image source is never an empty string (""), preventing
+ * browser re-download warnings and invalid image element states.
+ */
+export function getSafeImage(src?: string | null, fallback = DEFAULT_CAMERA_IMAGE): string {
+  if (!src || typeof src !== 'string' || !src.trim()) {
+    return fallback;
+  }
+  return src.trim();
+}
+
 export const readFileAsOptimizedDataUrl = (
   file: File,
   maxWidth = 1600,

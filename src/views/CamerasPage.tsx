@@ -14,6 +14,15 @@ import { useData } from '../context/DataContext';
 import { CameraCard } from '../components/CameraCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { AffiliateDisclosureBanner } from '../components/AffiliateDisclosure';
+import { CameraProduct } from '../types';
+import { formatCurrencyPrice } from '../utils/currency';
+
+const getEffectiveCameraPrice = (c: CameraProduct) => {
+  if (c.affiliateLinks && c.affiliateLinks.length > 0 && c.affiliateLinks[0].price > 0) {
+    return c.affiliateLinks[0].price;
+  }
+  return c.price || 0;
+};
 
 export const CamerasPage: React.FC = () => {
   const { cameras, navigateTo, comparedCameraIds } = useData();
@@ -23,7 +32,7 @@ export const CamerasPage: React.FC = () => {
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSensor, setSelectedSensor] = useState<string>('all');
-  const [maxPrice, setMaxPrice] = useState<number>(6500);
+  const [userSelectedMaxPrice, setUserSelectedMaxPrice] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<'rating' | 'price-asc' | 'price-desc' | 'newest'>('rating');
   const [layoutMode, setLayoutMode] = useState<'grid' | 'horizontal'>('grid');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -31,6 +40,29 @@ export const CamerasPage: React.FC = () => {
   const publishedCameras = useMemo(() => {
     return cameras.filter((c) => (c.status ?? 'published') === 'published');
   }, [cameras]);
+
+  const primaryCurrency = useMemo(() => {
+    for (const c of publishedCameras) {
+      if (c.affiliateLinks?.[0]?.currency) return c.affiliateLinks[0].currency;
+    }
+    return 'IDR';
+  }, [publishedCameras]);
+
+  const maxAvailablePrice = useMemo(() => {
+    if (publishedCameras.length === 0) return 50000000;
+    const prices = publishedCameras.map((c) => getEffectiveCameraPrice(c)).filter((p) => p > 0);
+    if (prices.length === 0) return 50000000;
+    return Math.max(...prices);
+  }, [publishedCameras]);
+
+  const minAvailablePrice = useMemo(() => {
+    if (publishedCameras.length === 0) return 0;
+    const prices = publishedCameras.map((c) => getEffectiveCameraPrice(c)).filter((p) => p > 0);
+    if (prices.length === 0) return 0;
+    return Math.min(...prices);
+  }, [publishedCameras]);
+
+  const activeMaxPrice = userSelectedMaxPrice ?? maxAvailablePrice;
 
   // Filter lists extracted dynamically
   const brands = useMemo(() => ['all', ...Array.from(new Set(publishedCameras.map((c) => c.brand)))], [publishedCameras]);
@@ -48,25 +80,26 @@ export const CamerasPage: React.FC = () => {
         const matchesBrand = selectedBrand === 'all' || cam.brand === selectedBrand;
         const matchesCategory = selectedCategory === 'all' || cam.category === selectedCategory;
         const matchesSensor = selectedSensor === 'all' || cam.specs.sensorFormat === selectedSensor;
-        const matchesPrice = cam.price <= maxPrice;
+        const effectivePrice = getEffectiveCameraPrice(cam);
+        const matchesPrice = userSelectedMaxPrice === null || effectivePrice <= userSelectedMaxPrice;
 
         return matchesSearch && matchesBrand && matchesCategory && matchesSensor && matchesPrice;
       })
       .sort((a, b) => {
         if (sortBy === 'rating') return b.rating - a.rating;
-        if (sortBy === 'price-asc') return a.price - b.price;
-        if (sortBy === 'price-desc') return b.price - a.price;
+        if (sortBy === 'price-asc') return getEffectiveCameraPrice(a) - getEffectiveCameraPrice(b);
+        if (sortBy === 'price-desc') return getEffectiveCameraPrice(b) - getEffectiveCameraPrice(a);
         if (sortBy === 'newest') return b.releaseYear - a.releaseYear;
         return 0;
       });
-  }, [cameras, searchQuery, selectedBrand, selectedCategory, selectedSensor, maxPrice, sortBy]);
+  }, [publishedCameras, searchQuery, selectedBrand, selectedCategory, selectedSensor, userSelectedMaxPrice, sortBy]);
 
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedBrand('all');
     setSelectedCategory('all');
     setSelectedSensor('all');
-    setMaxPrice(6500);
+    setUserSelectedMaxPrice(null);
     setSortBy('rating');
   };
 
@@ -264,22 +297,33 @@ export const CamerasPage: React.FC = () => {
           {/* Price Range Slider */}
           <div>
             <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#888]">Maximum Price</span>
-              <span className="font-serif font-normal text-[#1A1A1A]">${maxPrice.toLocaleString()}</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#888]">Filter Harga Maksimal</span>
+              <span className="font-serif font-bold text-[#1A1A1A]">
+                {userSelectedMaxPrice === null ? 'Semua Harga' : formatCurrencyPrice(activeMaxPrice, primaryCurrency)}
+              </span>
             </div>
             <input
               type="range"
-              min="900"
-              max="6500"
-              step="100"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
+              min={minAvailablePrice}
+              max={maxAvailablePrice}
+              step={maxAvailablePrice > 100000 ? 500000 : 50}
+              value={activeMaxPrice}
+              onChange={(e) => setUserSelectedMaxPrice(Number(e.target.value))}
               className="w-full accent-[#1A1A1A] cursor-pointer"
             />
             <div className="flex items-center justify-between text-[10px] text-[#888] mt-1">
-              <span>$900</span>
-              <span>$6,500+</span>
+              <span>{formatCurrencyPrice(minAvailablePrice, primaryCurrency)}</span>
+              <span>{formatCurrencyPrice(maxAvailablePrice, primaryCurrency)}</span>
             </div>
+            {userSelectedMaxPrice !== null && (
+              <button
+                type="button"
+                onClick={() => setUserSelectedMaxPrice(null)}
+                className="text-[10px] text-[#888] hover:text-black underline mt-1.5 cursor-pointer block"
+              >
+                Tampilkan Semua Harga
+              </button>
+            )}
           </div>
         </aside>
 

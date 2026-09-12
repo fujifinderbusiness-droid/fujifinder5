@@ -27,8 +27,9 @@ import { NewsletterSubscribeBox } from '../components/NewsletterSubscribeBox';
 import { AffiliateDisclosureBanner } from '../components/AffiliateDisclosure';
 import { ArticleCard } from '../components/ArticleCard';
 import { CameraCard } from '../components/CameraCard';
-import { generateArticleSchemaJsonString, buildCanonicalUrl } from '../utils/seoUtils';
+import { buildCanonicalUrl, generateArticleSchemaJsonString } from '../utils/seoUtils';
 import { SocialShareFloatingBar } from '../plugins/components/SocialShareFloatingBar';
+import { DEFAULT_ARTICLE_IMAGE, DEFAULT_AVATAR_IMAGE, getSafeImage } from '../utils/imageUtils';
 
 export const ArticleDetailPage: React.FC = () => {
   const { activeSlug, articles, cameras, navigateTo, siteSettings, getArticleBySlug, recordAffiliateClick, isAdminLoggedIn } = useData();
@@ -233,13 +234,13 @@ export const ArticleDetailPage: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#EEEBE6] text-xs text-[#666]">
           <div className="flex items-center gap-3">
             <img
-              src={article.author.avatar}
-              alt={article.author.name}
+              src={getSafeImage(article.author?.avatar, DEFAULT_AVATAR_IMAGE)}
+              alt={article.author?.name || 'Author'}
               className="w-10 h-10 object-cover border border-[#EEEBE6]"
             />
             <div>
-              <div className="font-semibold text-sm text-[#1A1A1A]">{article.author.name}</div>
-              <div className="text-[10px] text-[#888]">{article.author.role}</div>
+              <div className="font-semibold text-sm text-[#1A1A1A]">{article.author?.name}</div>
+              <div className="text-[10px] text-[#888]">{article.author?.role}</div>
             </div>
           </div>
 
@@ -260,7 +261,7 @@ export const ArticleDetailPage: React.FC = () => {
       {/* Cover Image */}
       <div className="h-80 sm:h-[480px] w-full overflow-hidden bg-[#E5E2DD] relative border border-[#EEEBE6]">
         <img
-          src={article.coverImage}
+          src={getSafeImage(article.coverImage, DEFAULT_ARTICLE_IMAGE)}
           alt={article.title}
           className="w-full h-full object-cover object-center"
         />
@@ -340,6 +341,7 @@ export const ArticleDetailPage: React.FC = () => {
               );
 
             case 'image':
+              if (!block.imageUrl || !block.imageUrl.trim()) return null;
               return (
                 <figure key={block.id} className="my-8 space-y-2">
                   <div className="overflow-hidden bg-[#F5F4F0] border border-[#EEEBE6] rounded-xl">
@@ -511,8 +513,8 @@ export const ArticleDetailPage: React.FC = () => {
       {/* Author Bio Box */}
       <section className="bg-white border border-[#EEEBE6] p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
         <img
-          src={article.author.avatar}
-          alt={article.author.name}
+          src={getSafeImage(article.author?.avatar, DEFAULT_AVATAR_IMAGE)}
+          alt={article.author?.name || 'Author'}
           className="w-20 h-20 object-cover border border-[#EEEBE6] shrink-0"
         />
         <div className="space-y-2 text-center sm:text-left">

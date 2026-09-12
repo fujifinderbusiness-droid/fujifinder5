@@ -8,6 +8,8 @@ import { cmsStore } from './server/data/cmsStore';
 import { emailService } from './server/email/EmailService';
 import { verifyEmailAddress } from './server/utils/emailValidator';
 import { EmailCampaign, EmailTemplate } from './src/types/newsletterTypes';
+import { supabaseService } from './server/db/supabaseClient';
+
 
 dotenv.config();
 
@@ -1232,10 +1234,140 @@ app.post('/api/site/reset', requireAdminAuth, (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
+// SUPABASE DATABASE & TABLE SYNC ENDPOINTS
+// -------------------------------------------------------------
+
+/**
+ * 27. SUPABASE: Check live connection status & table statistics
+ */
+app.get('/api/supabase/status', async (req: Request, res: Response) => {
+  try {
+    const testResult = await supabaseService.checkConnection();
+    const status = supabaseService.getStatus();
+    return res.json({
+      success: true,
+      ...status,
+      test: testResult,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to check Supabase status',
+    });
+  }
+});
+
+/**
+ * 28. SUPABASE: Trigger on-demand sync from Supabase tables
+ */
+app.post('/api/supabase/sync', async (req: Request, res: Response) => {
+  try {
+    await Promise.all([
+      cmsStore.initFromSupabase(),
+      newsletterStore.initFromSupabase(),
+    ]);
+    const status = supabaseService.getStatus();
+    return res.json({
+      success: true,
+      message: 'Successfully synchronized data from all Supabase tables',
+      ...status,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to sync with Supabase',
+    });
+  }
+});
+
+/**
+ * 29. SUPABASE: Push all existing data to Supabase tables
+ */
+app.post('/api/supabase/push-all', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const siteData = cmsStore.getAdminSiteData();
+    const subs = newsletterStore.getSubscribers();
+    const campaigns = newsletterStore.getCampaigns();
+    const logs = newsletterStore.getLogs(50);
+
+    let savedCameras = 0;
+    for (const cam of siteData.cameras) {
+      const ok = await supabaseService.saveCamera(cam);
+      if (ok) savedCameras++;
+    }
+
+    let savedArticles = 0;
+    for (const art of siteData.articles) {
+      const ok = await supabaseService.saveArticle(art);
+      if (ok) savedArticles++;
+    }
+
+    let savedMedia = 0;
+    for (const med of siteData.mediaAssets) {
+      const ok = await supabaseService.saveMediaAsset(med);
+      if (ok) savedMedia++;
+    }
+
+    let savedSubs = 0;
+    for (const sub of subs) {
+      const ok = await supabaseService.saveSubscriber(sub);
+      if (ok) savedSubs++;
+    }
+
+    let savedCampaigns = 0;
+    for (const cmp of campaigns) {
+      const ok = await supabaseService.saveEmailCampaign(cmp);
+      if (ok) savedCampaigns++;
+    }
+
+    let savedClicks = 0;
+    for (const click of siteData.affiliateClicks) {
+      const ok = await supabaseService.recordAffiliateClick(click);
+      if (ok) savedClicks++;
+    }
+
+    await supabaseService.checkConnection();
+
+    return res.json({
+      success: true,
+      message: 'All existing local data pushed to Supabase tables successfully',
+      results: {
+        cameras: `${savedCameras}/${siteData.cameras.length}`,
+        articles: `${savedArticles}/${siteData.articles.length}`,
+        subscribers: `${savedSubs}/${subs.length}`,
+        mediaAssets: `${savedMedia}/${siteData.mediaAssets.length}`,
+        campaigns: `${savedCampaigns}/${campaigns.length}`,
+        affiliateClicks: `${savedClicks}/${siteData.affiliateClicks.length}`,
+      },
+      currentSupabaseStats: supabaseService.getStatus(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to push all data to Supabase',
+    });
+  }
+});
+
+// -------------------------------------------------------------
 // VITE DEV MIDDLEWARE / STATIC ASSET SERVING
 // -------------------------------------------------------------
 async function startServer() {
+  // Initialize from Supabase cloud database
+  try {
+    console.log('[FujiFinder Server] Connecting to Supabase project zxzitnulvhbnkjvfsmig...');
+    await Promise.all([
+      cmsStore.initFromSupabase(),
+      newsletterStore.initFromSupabase(),
+    ]);
+    console.log('[FujiFinder Server] Initialized from Supabase tables successfully');
+  } catch (err: any) {
+    console.error('[FujiFinder Server] Supabase initial load notice:', err.message);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
+
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
