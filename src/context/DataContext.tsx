@@ -156,6 +156,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [adminAccount, setAdminAccount] = useState<AdminAccountConfig>(DEFAULT_ADMIN_ACCOUNT);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
     try {
+      const token = getAdminToken();
+      if (!token) {
+        localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+        return null;
+      }
       const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_SESSION);
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -163,7 +168,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const isAdminLoggedIn = !!adminUser;
+  const isAdminLoggedIn = Boolean(adminUser && getAdminToken());
   const versionRef = useRef(publishedVersion);
   versionRef.current = publishedVersion;
 
@@ -193,8 +198,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setPublishedVersion(adminData.published_version);
           setCachedPublishedVersion(adminData.published_version);
           return;
-        } catch (adminErr) {
-          console.warn('[DataContext] Admin data fetch failed, falling back to public data:', adminErr);
+        } catch (adminErr: any) {
+          console.warn('[DataContext] Admin data fetch failed, checking error:', adminErr);
+          const isAuthError =
+            adminErr?.message?.includes('401') ||
+            adminErr?.message?.includes('Unauthorized') ||
+            adminErr?.message?.includes('kedaluwarsa') ||
+            adminErr?.message?.includes('expired');
+          if (isAuthError) {
+            setAdminUser(null);
+            setAdminToken(null);
+            try {
+              localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+            } catch {}
+          }
         }
       }
 
@@ -240,14 +257,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const onCmsPublishedUpdated = () => {
       loadDataFromServer();
     };
+    const onAuthExpired = () => {
+      console.warn('[DataContext] Session expired event caught. Resetting admin user state.');
+      setAdminUser(null);
+      setAdminToken(null);
+      try {
+        localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+      } catch {}
+    };
 
     window.addEventListener('focus', onFocus);
     window.addEventListener('cms:published-updated', onCmsPublishedUpdated);
+    window.addEventListener('cms:auth-expired', onAuthExpired);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('cms:published-updated', onCmsPublishedUpdated);
+      window.removeEventListener('cms:auth-expired', onAuthExpired);
     };
   }, [loadDataFromServer]);
 
@@ -474,7 +501,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
       console.error('Failed to save article to backend:', err);
-      throw new Error('Changes could not be saved. Please try again.');
+      throw new Error(err.message || 'Perubahan artikel gagal disimpan. Silakan coba lagi.');
     }
   };
 
@@ -486,7 +513,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
       console.error('Failed to delete article on backend:', err);
-      throw new Error('Changes could not be saved. Please try again.');
+      throw new Error(err.message || 'Gagal menghapus artikel. Silakan coba lagi.');
     }
   };
 
@@ -538,7 +565,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
       console.error('Failed to save camera to backend:', err);
-      throw new Error('Changes could not be saved. Please try again.');
+      throw new Error(err.message || 'Perubahan kamera gagal disimpan. Silakan coba lagi.');
     }
   };
 
@@ -558,7 +585,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
       console.error('Failed to delete camera on backend:', err);
-      throw new Error('Changes could not be saved. Please try again.');
+      throw new Error(err.message || 'Gagal menghapus kamera. Silakan coba lagi.');
     }
   };
 

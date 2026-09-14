@@ -884,10 +884,12 @@ function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-token'];
   if (!authHeader) return null;
   if (typeof authHeader === 'string') {
-    if (authHeader.startsWith('Bearer ')) {
-      return authHeader.slice(7).trim();
+    let token = authHeader.trim();
+    if (token.startsWith('Bearer ')) {
+      token = token.slice(7).trim();
     }
-    return authHeader.trim();
+    token = token.replace(/^["']|["']$/g, '').trim();
+    return token || null;
   }
   return null;
 }
@@ -967,6 +969,17 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
   const token = extractBearerToken(req);
   if (token) cmsStore.removeSession(token);
   return res.json({ success: true });
+});
+
+/**
+ * 5b. ADMIN: Verify Session Token
+ */
+app.get('/api/auth/verify', (req: Request, res: Response) => {
+  const token = extractBearerToken(req);
+  if (!token || !cmsStore.validateSessionToken(token)) {
+    return res.status(401).json({ success: false, authenticated: false, error: 'Session expired or invalid.' });
+  }
+  return res.json({ success: true, authenticated: true, user: cmsStore.getAdminUser() });
 });
 
 /**

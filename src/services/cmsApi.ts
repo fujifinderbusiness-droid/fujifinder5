@@ -114,14 +114,26 @@ async function apiRequest<T>(url: string, options: RequestInit & { silent?: bool
   }
 
   if (!res.ok) {
-    let errMessage = 'Changes could not be saved. Please try again.';
+    let errMessage = res.status === 401
+      ? 'Sesi admin kedaluwarsa atau tidak valid. Silakan login kembali.'
+      : `Permintaan gagal (${res.status} ${res.statusText}).`;
     try {
       const errData = await res.json();
-      if (errData && errData.error) {
-        errMessage = errData.error;
+      if (errData && (errData.error || errData.message)) {
+        errMessage = errData.error || errData.message;
       }
     } catch {
-      // Use fallback error message
+      // Use status-derived message
+    }
+
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cms:auth-expired', { detail: { message: errMessage } }));
+      }
+    }
+
+    if (!silent) {
+      console.error(`[CMS API] HTTP ${res.status} for ${url}:`, errMessage);
     }
     throw new Error(errMessage);
   }
@@ -195,6 +207,18 @@ export async function logoutAdminApi(): Promise<void> {
     await apiRequest('/api/auth/logout', { method: 'POST' });
   } finally {
     setAdminToken(null);
+  }
+}
+
+export async function verifyAdminSessionApi(): Promise<{ authenticated: boolean; user?: AdminUser }> {
+  try {
+    const res = await apiRequest<{ success: boolean; authenticated: boolean; user?: AdminUser }>('/api/auth/verify', {
+      method: 'GET',
+      silent: true,
+    });
+    return { authenticated: Boolean(res?.authenticated), user: res?.user };
+  } catch {
+    return { authenticated: false };
   }
 }
 

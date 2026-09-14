@@ -34,8 +34,10 @@ export const SeoToolkitEditorWidget: React.FC<SeoToolkitEditorWidgetProps> = ({
     : 0;
   const currentDensity = totalWords > 0 ? ((kwMatches / totalWords) * 100).toFixed(1) : '0.0';
 
-  const kwInTitle = focusKeyword && title.toLowerCase().includes(focusKeyword.toLowerCase());
-  const kwInSlug = focusKeyword && (slug || '').toLowerCase().includes(focusKeyword.toLowerCase().replace(/\s+/g, '-'));
+  const safeTitle = (title || '').toLowerCase();
+  const safeKw = (focusKeyword || '').toLowerCase();
+  const kwInTitle = Boolean(safeKw && safeTitle.includes(safeKw));
+  const kwInSlug = Boolean(safeKw && (slug || '').toLowerCase().includes(safeKw.replace(/\s+/g, '-')));
 
   return (
     <div className="bg-[#1C1C1C] border border-amber-500/30 p-5 mt-6 text-white space-y-4">

@@ -30,8 +30,9 @@ export const AffiliateCloakerEditorWidget: React.FC<AffiliateCloakerEditorWidget
     { name: 'Canon EOS R6 II', slug: 'canon-r6-ii', defaultUrl: 'https://www.bhphotovideo.com/c/product/1733224-REG/canon_eos_r6_mark_ii.html' },
   ];
 
+  const safeContent = (content || '').toLowerCase();
   const mentionsFound = cameraCatalogList.filter((cam) =>
-    content.toLowerCase().includes(cam.name.toLowerCase())
+    safeContent.includes((cam.name || '').toLowerCase())
   );
 
   if (mentionsFound.length === 0) return null;

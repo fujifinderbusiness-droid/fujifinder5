@@ -72,14 +72,16 @@ export const CamerasPage: React.FC = () => {
   const filteredCameras = useMemo(() => {
     return publishedCameras
       .filter((cam) => {
+        const q = (searchQuery || '').toLowerCase();
         const matchesSearch = 
-          cam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          cam.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          cam.idealUseCase.toLowerCase().includes(searchQuery.toLowerCase());
+          !q ||
+          (cam.name || '').toLowerCase().includes(q) ||
+          (cam.brand || '').toLowerCase().includes(q) ||
+          (cam.idealUseCase || '').toLowerCase().includes(q);
 
         const matchesBrand = selectedBrand === 'all' || cam.brand === selectedBrand;
         const matchesCategory = selectedCategory === 'all' || cam.category === selectedCategory;
-        const matchesSensor = selectedSensor === 'all' || cam.specs.sensorFormat === selectedSensor;
+        const matchesSensor = selectedSensor === 'all' || cam.specs?.sensorFormat === selectedSensor;
         const effectivePrice = getEffectiveCameraPrice(cam);
         const matchesPrice = userSelectedMaxPrice === null || effectivePrice <= userSelectedMaxPrice;
 

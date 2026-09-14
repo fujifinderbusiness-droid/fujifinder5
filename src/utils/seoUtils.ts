@@ -168,10 +168,18 @@ export function analyzeArticleSEO(
   // Derive suggested keywords from cameras & title
   const suggestedKeywords: string[] = [];
   if (primaryCamera) {
-    suggestedKeywords.push(`${primaryCamera.name.toLowerCase()} review`);
-    suggestedKeywords.push(`${primaryCamera.name.toLowerCase()} field test`);
-    suggestedKeywords.push(`${primaryCamera.brand.toLowerCase()} ${primaryCamera.specs.sensorFormat.toLowerCase()}`);
-    suggestedKeywords.push(`${primaryCamera.name.toLowerCase()} specs`);
+    const camName = (primaryCamera.name || '').toLowerCase();
+    const camBrand = (primaryCamera.brand || '').toLowerCase();
+    const sensorFormat = (primaryCamera.specs?.sensorFormat || '').toLowerCase();
+
+    if (camName) {
+      suggestedKeywords.push(`${camName} review`);
+      suggestedKeywords.push(`${camName} field test`);
+      suggestedKeywords.push(`${camName} specs`);
+    }
+    if (camBrand && sensorFormat) {
+      suggestedKeywords.push(`${camBrand} ${sensorFormat}`);
+    }
   }
   suggestedKeywords.push('camera review 2026', 'sensor lab test', 'street photography gear');
 
@@ -679,27 +687,29 @@ export function autoGenerateSEOMetadata(
 
   // Determine Focus Keyword
   let focusKeyword = '';
+  const safeCategory = (category || '').toLowerCase();
   if (primaryCamera) {
-    if (category.toLowerCase().includes('guide') || category.toLowerCase().includes('buying')) {
-      focusKeyword = `${primaryCamera.name.toLowerCase()} buying guide`;
+    const camName = (primaryCamera.name || '').toLowerCase();
+    if (safeCategory.includes('guide') || safeCategory.includes('buying')) {
+      focusKeyword = `${camName || 'camera'} buying guide`;
     } else {
-      focusKeyword = `${primaryCamera.name.toLowerCase()} review`;
+      focusKeyword = `${camName || 'camera'} review`;
     }
   } else {
     // Extract subject from title
-    const cleanTitle = currentTitle.replace(/[:–—|].*$/, '').trim();
+    const cleanTitle = (currentTitle || '').replace(/[:–—|].*$/, '').trim();
     focusKeyword = cleanTitle.toLowerCase();
   }
 
   // Determine Secondary Keywords
   const secondaryKeywords: string[] = [];
   if (primaryCamera) {
-    secondaryKeywords.push(
-      `${primaryCamera.brand.toLowerCase()} ${primaryCamera.name.toLowerCase()}`,
-      `${primaryCamera.name.toLowerCase()} specs`,
-      `uji lab ${primaryCamera.name.toLowerCase()}`,
-      `${primaryCamera.specs.sensorFormat.toLowerCase()} mirrorless 2026`
-    );
+    const camName = (primaryCamera.name || '').toLowerCase();
+    const camBrand = (primaryCamera.brand || '').toLowerCase();
+    const sensorFormat = (primaryCamera.specs?.sensorFormat || '').toLowerCase();
+    if (camBrand && camName) secondaryKeywords.push(`${camBrand} ${camName}`);
+    if (camName) secondaryKeywords.push(`${camName} specs`, `uji lab ${camName}`);
+    if (sensorFormat) secondaryKeywords.push(`${sensorFormat} mirrorless 2026`);
   } else {
     secondaryKeywords.push('camera review 2026', 'uji lab sensor', 'rekomendasi kamera jalanan');
   }

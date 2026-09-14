@@ -33,21 +33,23 @@ export const BlogPage: React.FC = () => {
       // Only show published articles to public readers
       if (art.status !== 'published') return false;
 
+      const artCategory = (art.category || '').toLowerCase();
+      const selCat = (selectedCategory || '').toLowerCase();
       const matchesCat = 
         !selectedCategory || 
         selectedCategory === 'All' || 
-        art.category.toLowerCase() === selectedCategory.toLowerCase() ||
-        (selectedCategory === 'Mirrorless' && art.category.toLowerCase().includes('mirrorless'));
+        artCategory === selCat ||
+        (selectedCategory === 'Mirrorless' && artCategory.includes('mirrorless'));
 
-      const q = searchQuery.toLowerCase().trim();
+      const q = (searchQuery || '').toLowerCase().trim();
       const matchesSearch = 
         !q ||
-        art.title.toLowerCase().includes(q) ||
-        art.excerpt.toLowerCase().includes(q) ||
-        art.category.toLowerCase().includes(q) ||
-        art.author.name.toLowerCase().includes(q) ||
+        (art.title || '').toLowerCase().includes(q) ||
+        (art.excerpt || '').toLowerCase().includes(q) ||
+        artCategory.includes(q) ||
+        (art.author?.name || '').toLowerCase().includes(q) ||
         (art.seo?.focusKeyword && art.seo.focusKeyword.toLowerCase().includes(q)) ||
-        art.blocks.some((b) => b.text && b.text.toLowerCase().includes(q));
+        (Array.isArray(art.blocks) && art.blocks.some((b) => b.text && b.text.toLowerCase().includes(q)));
 
       return matchesCat && matchesSearch;
     });

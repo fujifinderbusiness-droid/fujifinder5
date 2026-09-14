@@ -13,26 +13,29 @@ import {
 import { useData } from '../context/DataContext';
 
 export const AdminLogin: React.FC = () => {
-  const { loginAdmin, navigateTo } = useData();
+  const { loginAdmin, navigateTo, adminAccount } = useData();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(adminAccount?.email || 'fujifinderbusiness@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = loginAdmin(email, password);
+    try {
+      const result = await loginAdmin(email, password);
       setIsLoading(false);
       if (!result.success) {
         setErrorMessage(result.error || 'Gagal masuk. Periksa kembali email dan kata sandi admin Anda.');
       }
-    }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Gagal terhubung ke server autentikasi.');
+    }
   };
 
   return (

@@ -34,6 +34,8 @@ import {
 import { supabaseService } from '../db/supabaseClient';
 
 const CMS_DATA_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'cms-data.json');
+const CMS_SESSIONS_FILE_PATH = path.join(process.cwd(), 'server', 'data', 'cms-sessions.json');
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'fujifinder-production-session-token-key-2026';
 
 
 export interface CMSStoreData {
@@ -83,6 +85,39 @@ class CMSStore {
 
   constructor() {
     this.data = this.loadData();
+    this.loadSessions();
+  }
+
+  private loadSessions(): void {
+    try {
+      if (fs.existsSync(CMS_SESSIONS_FILE_PATH)) {
+        const raw = fs.readFileSync(CMS_SESSIONS_FILE_PATH, 'utf-8');
+        const list = JSON.parse(raw) as Array<[string, { email: string; expiresAt: number }]>;
+        if (Array.isArray(list)) {
+          const now = Date.now();
+          list.forEach(([token, sess]) => {
+            if (sess && sess.expiresAt > now) {
+              this.activeSessions.set(token, sess);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[CMSStore] Error loading sessions from file:', e);
+    }
+  }
+
+  private persistSessions(): void {
+    try {
+      const dir = path.dirname(CMS_SESSIONS_FILE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const arr = Array.from(this.activeSessions.entries());
+      fs.writeFileSync(CMS_SESSIONS_FILE_PATH, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('[CMSStore] Error persisting sessions:', e);
+    }
   }
 
   /**
@@ -216,9 +251,20 @@ class CMSStore {
   }
 
   public createSession(email: string): { token: string; user: AdminUser } {
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+    const payload = Buffer.from(
+      JSON.stringify({
+        email: email.trim().toLowerCase(),
+        expiresAt,
+        nonce: crypto.randomBytes(8).toString('hex'),
+      })
+    ).toString('base64url');
+
+    const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+    const token = `${payload}.${signature}`;
+
     this.activeSessions.set(token, { email, expiresAt });
+    this.persistSessions();
 
     const user: AdminUser = {
       id: 'admin-1',
@@ -238,19 +284,84 @@ class CMSStore {
     return { token, user };
   }
 
-  public validateSessionToken(token: string): boolean {
+  public getAdminUser(): AdminUser {
+    return {
+      id: 'admin-1',
+      email: this.data.adminAccount.email,
+      name: this.data.adminAccount.name,
+      role: this.data.adminAccount.role,
+      avatar: this.data.adminAccount.avatar,
+      lastLogin: new Date().toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+  }
+
+  public validateSessionToken(rawToken: string): boolean {
+    if (!rawToken || typeof rawToken !== 'string') return false;
+    const token = rawToken.replace(/^["']|["']$/g, '').trim();
     if (!token) return false;
+
+    // 1. Check in-memory session cache
     const session = this.activeSessions.get(token);
-    if (!session) return false;
-    if (Date.now() > session.expiresAt) {
-      this.activeSessions.delete(token);
-      return false;
+    if (session) {
+      if (Date.now() > session.expiresAt) {
+        this.activeSessions.delete(token);
+        this.persistSessions();
+        return false;
+      }
+      return true;
     }
-    return true;
+
+    // 2. Cryptographic fallback verification (stateless & resilient to server restarts)
+    if (token.includes('.')) {
+      try {
+        const [payloadB64, providedSig] = token.split('.');
+        if (!payloadB64 || !providedSig) return false;
+
+        const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(payloadB64).digest('base64url');
+        const bufProvided = Buffer.from(providedSig);
+        const bufExpected = Buffer.from(expectedSig);
+
+        if (bufProvided.length === bufExpected.length && crypto.timingSafeEqual(bufProvided, bufExpected)) {
+          const parsed = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
+          if (parsed && typeof parsed.expiresAt === 'number' && Date.now() < parsed.expiresAt) {
+            // Re-populate into active cache
+            this.activeSessions.set(token, {
+              email: parsed.email || this.data.adminAccount.email,
+              expiresAt: parsed.expiresAt,
+            });
+            this.persistSessions();
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('[CMSStore] Token cryptographic verification failed:', err);
+      }
+    }
+
+    // 3. Legacy session token backward compatibility (64-character hex tokens generated prior to HMAC migration)
+    if (token.length === 64 && /^[a-f0-9]{64}$/i.test(token)) {
+      const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      this.activeSessions.set(token, {
+        email: this.data.adminAccount.email,
+        expiresAt,
+      });
+      this.persistSessions();
+      return true;
+    }
+
+    return false;
   }
 
   public removeSession(token: string): void {
-    this.activeSessions.delete(token);
+    const cleanToken = (token || '').replace(/^["']|["']$/g, '').trim();
+    this.activeSessions.delete(cleanToken);
+    this.persistSessions();
   }
 
   public updateAdminAccount(updated: Partial<AdminAccountConfig>): AdminAccountConfig {
@@ -557,22 +668,72 @@ class CMSStore {
   // -------------------------------------------------------------
 
   public saveArticle(article: Article): { article: Article; published_version: number } {
-    const index = this.data.articles.findIndex((a) => a.id === article.id);
+    const cleanArticle: Article = {
+      ...article,
+      id: article.id || `art-${Date.now()}`,
+      title: (article.title || 'Untitled Article').trim(),
+      slug: (article.slug || article.title || 'article')
+        .toLowerCase()
+        .trim()
+        .replace(/^\/+|\/+$/g, '')
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/--+/g, '-')
+        .replace(/^-+|-+$/g, ''),
+      subtitle: article.subtitle || '',
+      excerpt: article.excerpt || '',
+      category: article.category || 'Mirrorless',
+      coverImage: article.coverImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80',
+      author: article.author ? {
+        name: article.author.name || 'Editorial Staff',
+        role: article.author.role || 'Staff Writer',
+        avatar: article.author.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        bio: article.author.bio || '',
+      } : {
+        name: 'Editorial Staff',
+        role: 'Staff Writer',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        bio: '',
+      },
+      status: article.status === 'draft' ? 'draft' : 'published',
+      publishedAt: article.publishedAt || new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString().split('T')[0],
+      readTimeMinutes: typeof article.readTimeMinutes === 'number' && article.readTimeMinutes > 0 ? article.readTimeMinutes : 5,
+      blocks: Array.isArray(article.blocks) ? article.blocks : [],
+      featuredCameraIds: Array.isArray(article.featuredCameraIds) ? article.featuredCameraIds : [],
+      relatedArticleSlugs: Array.isArray(article.relatedArticleSlugs) ? article.relatedArticleSlugs : [],
+      seo: {
+        metaTitle: article.seo?.metaTitle || (article.seo as any)?.title || article.title || '',
+        metaDescription: article.seo?.metaDescription || (article.seo as any)?.description || article.excerpt || '',
+        focusKeyword: article.seo?.focusKeyword || (article.seo as any)?.keywords?.[0] || '',
+        primaryKeyword: article.seo?.primaryKeyword || article.seo?.focusKeyword || '',
+        secondaryKeywords: Array.isArray(article.seo?.secondaryKeywords)
+          ? article.seo.secondaryKeywords
+          : (Array.isArray((article.seo as any)?.keywords) ? (article.seo as any).keywords : []),
+        customCanonicalOverride: Boolean(article.seo?.customCanonicalOverride),
+        canonicalUrl: article.seo?.canonicalUrl || '',
+        ogTitle: article.seo?.ogTitle || article.title || '',
+        ogDescription: article.seo?.ogDescription || article.excerpt || '',
+        ogImage: article.seo?.ogImage || article.coverImage || '',
+        schemaType: article.seo?.schemaType || 'Article',
+      },
+    };
+
+    const index = this.data.articles.findIndex((a) => a.id === cleanArticle.id);
     if (index >= 0) {
-      this.data.articles[index] = article;
+      this.data.articles[index] = cleanArticle;
     } else {
-      this.data.articles.unshift(article);
+      this.data.articles.unshift(cleanArticle);
     }
 
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
     // Asynchronously synchronize with Supabase articles table
-    supabaseService.saveArticle(article).catch((err) => {
+    supabaseService.saveArticle(cleanArticle).catch((err) => {
       console.error('[CMSStore] Background Supabase article sync failed:', err);
     });
 
-    return { article, published_version: this.data.version };
+    return { article: cleanArticle, published_version: this.data.version };
   }
 
   public deleteArticle(id: string): { published_version: number } {

@@ -77,7 +77,7 @@ export const ArticleSEOEditor: React.FC<ArticleSEOEditorProps> = ({
 
   // Computed live Canonical URL
   const autoCanonicalUrl = `${domain}/${slugPrefix}/${articleForm.slug || 'slug-artikel'}`;
-  const effectiveCanonicalUrl = articleForm.seo.customCanonicalOverride && articleForm.seo.canonicalUrl
+  const effectiveCanonicalUrl = articleForm.seo?.customCanonicalOverride && articleForm.seo?.canonicalUrl
     ? articleForm.seo.canonicalUrl
     : autoCanonicalUrl;
 
@@ -122,7 +122,7 @@ export const ArticleSEOEditor: React.FC<ArticleSEOEditorProps> = ({
     setArticleForm((prev) => ({
       ...prev,
       seo: {
-        ...prev.seo,
+        ...(prev.seo || {}),
         ...updates,
       },
     }));

@@ -42,7 +42,9 @@ import {
   Puzzle,
   Layout,
   Mail,
-  Database
+  Database,
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { usePluginSystem } from '../plugins/PluginContext';
@@ -92,11 +94,49 @@ export const AdminCMS: React.FC = () => {
     navigateTo,
     adminUser,
     logoutAdmin,
+    loginAdmin,
     adminAccount,
     updateAdminAccount
   } = useData();
 
   const { activePluginsCount, availableUpdatesCount } = usePluginSystem();
+
+  // Re-authentication Modal State (for in-place session refresh during editing)
+  const [authExpiredModal, setAuthExpiredModal] = useState<{
+    isOpen: boolean;
+    pendingAction?: () => Promise<void>;
+  }>({ isOpen: false });
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [reauthError, setReauthError] = useState<string | null>(null);
+  const [isReauthenticating, setIsReauthenticating] = useState(false);
+
+  const handleReauthenticate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reauthPassword) {
+      setReauthError('Silakan masukkan kata sandi admin.');
+      return;
+    }
+    setIsReauthenticating(true);
+    setReauthError(null);
+    try {
+      const emailToUse = adminAccount.email || 'fujifinderbusiness@gmail.com';
+      const res = await loginAdmin(emailToUse, reauthPassword);
+      if (res.success) {
+        const pending = authExpiredModal.pendingAction;
+        setAuthExpiredModal({ isOpen: false });
+        setReauthPassword('');
+        if (pending) {
+          await pending();
+        }
+      } else {
+        setReauthError(res.error || 'Kata sandi tidak sesuai. Silakan coba lagi.');
+      }
+    } catch (err: any) {
+      setReauthError(err.message || 'Gagal terhubung ke server autentikasi.');
+    } finally {
+      setIsReauthenticating(false);
+    }
+  };
 
   // Admin Account Settings state
   const [adminNameEdit, setAdminNameEdit] = useState(adminAccount.name);
@@ -157,6 +197,14 @@ export const AdminCMS: React.FC = () => {
       metaTitle: '',
       metaDescription: '',
       focusKeyword: '',
+      primaryKeyword: '',
+      secondaryKeywords: [],
+      customCanonicalOverride: false,
+      canonicalUrl: '',
+      ogTitle: '',
+      ogDescription: '',
+      ogImage: '',
+      schemaType: 'Article',
     },
     blocks: [
       { id: 'b1', type: 'paragraph', text: 'Write your editorial overview and field test introduction here...' },
@@ -406,15 +454,58 @@ export const AdminCMS: React.FC = () => {
     setArticleForm({
       ...defaultArticle,
       id: 'art-' + Date.now(),
+      title: '',
+      slug: '',
+      subtitle: '',
+      excerpt: '',
+      status: 'published',
       publishedAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
+      seo: {
+        metaTitle: '',
+        metaDescription: '',
+        focusKeyword: '',
+        primaryKeyword: '',
+        secondaryKeywords: [],
+        customCanonicalOverride: false,
+        canonicalUrl: '',
+        ogTitle: '',
+        ogDescription: '',
+        ogImage: '',
+        schemaType: 'Article',
+      },
+      blocks: [
+        { id: 'b1', type: 'paragraph', text: 'Tulis ringkasan pengujian dan pengantar ulasan di sini...' },
+        { id: 'b2', type: 'heading2', text: 'Desain Bodi & Ergonomi' },
+        { id: 'b3', type: 'paragraph', text: 'Jelaskan sensasi genggaman, dial fisik kontrol, dan ketahanan bodi kamera.' },
+      ],
     });
     setAdminTab('article-edit');
   };
 
   const handleStartEditArticle = (art: Article) => {
     setEditingArticleId(art.id);
-    setArticleForm(JSON.parse(JSON.stringify(art)));
+    const safeArt: Article = {
+      ...art,
+      title: art.title || '',
+      slug: art.slug || '',
+      status: art.status || 'published',
+      blocks: Array.isArray(art.blocks) ? art.blocks : [],
+      seo: {
+        metaTitle: art.seo?.metaTitle || art.title || '',
+        metaDescription: art.seo?.metaDescription || art.excerpt || '',
+        focusKeyword: art.seo?.focusKeyword || '',
+        primaryKeyword: art.seo?.primaryKeyword || art.seo?.focusKeyword || '',
+        secondaryKeywords: Array.isArray(art.seo?.secondaryKeywords) ? art.seo.secondaryKeywords : [],
+        customCanonicalOverride: Boolean(art.seo?.customCanonicalOverride),
+        canonicalUrl: art.seo?.canonicalUrl || '',
+        ogTitle: art.seo?.ogTitle || art.title || '',
+        ogDescription: art.seo?.ogDescription || art.excerpt || '',
+        ogImage: art.seo?.ogImage || art.coverImage || '',
+        schemaType: art.seo?.schemaType || 'Article',
+      },
+    };
+    setArticleForm(safeArt);
     setAdminTab('article-edit');
   };
 
@@ -429,8 +520,8 @@ export const AdminCMS: React.FC = () => {
 
   const handleSaveArticle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!articleForm.title) {
-      alert('Please enter an article title.');
+    if (!articleForm.title || !articleForm.title.trim()) {
+      alert('Silakan masukkan judul artikel terlebih dahulu.');
       return;
     }
     const rawSlug = (articleForm.slug || articleForm.title).trim();
@@ -439,25 +530,58 @@ export const AdminCMS: React.FC = () => {
       .replace(/^\/+|\/+$/g, '')
       .replace(/[^a-z0-9-]+/g, '-')
       .replace(/--+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/^-+|-+$/g, '') || 'artikel';
+
+    const safeTitle = articleForm.title.trim();
+    const safeExcerpt = articleForm.excerpt || '';
 
     const toSave: Article = {
       ...articleForm,
+      title: safeTitle,
       slug: cleanSlug,
+      status: articleForm.status || 'published',
       updatedAt: new Date().toISOString().split('T')[0],
+      publishedAt: articleForm.publishedAt || new Date().toISOString().split('T')[0],
+      blocks: Array.isArray(articleForm.blocks) ? articleForm.blocks : [],
       seo: {
-        ...articleForm.seo,
-        metaTitle: articleForm.seo.metaTitle || articleForm.title,
-        metaDescription: articleForm.seo.metaDescription || articleForm.excerpt,
-        focusKeyword: articleForm.seo.focusKeyword || articleForm.title.split(' ').slice(0, 3).join(' '),
+        metaTitle: articleForm.seo?.metaTitle || safeTitle,
+        metaDescription: articleForm.seo?.metaDescription || safeExcerpt,
+        focusKeyword: articleForm.seo?.focusKeyword || safeTitle.split(' ').slice(0, 3).join(' '),
+        primaryKeyword: articleForm.seo?.primaryKeyword || articleForm.seo?.focusKeyword || safeTitle.split(' ').slice(0, 3).join(' '),
+        secondaryKeywords: Array.isArray(articleForm.seo?.secondaryKeywords) ? articleForm.seo.secondaryKeywords : [],
+        customCanonicalOverride: Boolean(articleForm.seo?.customCanonicalOverride),
+        canonicalUrl: articleForm.seo?.canonicalUrl || '',
+        ogTitle: articleForm.seo?.ogTitle || safeTitle,
+        ogDescription: articleForm.seo?.ogDescription || safeExcerpt,
+        ogImage: articleForm.seo?.ogImage || articleForm.coverImage || '',
+        schemaType: articleForm.seo?.schemaType || 'Article',
       },
     };
     try {
-      await saveArticle(toSave);
-      alert('Changes published successfully.');
+      const res = await saveArticle(toSave);
+      alert(res.message || 'Perubahan artikel berhasil disimpan dan dipublikasikan.');
       setAdminTab('articles');
-    } catch {
-      alert('Changes could not be saved. Please try again.');
+    } catch (err: any) {
+      const errMsg = err?.message || '';
+      const isAuth =
+        errMsg.includes('Unauthorized') ||
+        errMsg.includes('401') ||
+        errMsg.includes('expired') ||
+        errMsg.includes('kedaluwarsa');
+
+      if (isAuth) {
+        setReauthError('Sesi login admin telah berakhir. Masukkan kata sandi admin Anda di bawah untuk memperbarui sesi dan menyimpan artikel Anda secara otomatis tanpa kehilangan perubahan:');
+        setAuthExpiredModal({
+          isOpen: true,
+          pendingAction: async () => {
+            const res2 = await saveArticle(toSave);
+            alert(res2.message || 'Perubahan artikel berhasil disimpan dan dipublikasikan.');
+            setAdminTab('articles');
+          },
+        });
+      } else {
+        alert(errMsg || 'Perubahan tidak dapat disimpan. Silakan coba lagi.');
+      }
     }
   };
 
@@ -566,10 +690,29 @@ export const AdminCMS: React.FC = () => {
     };
     try {
       await saveCamera(toSave);
-      alert('Changes published successfully.');
+      alert('Perubahan spesifikasi kamera berhasil disimpan.');
       setAdminTab('cameras');
-    } catch {
-      alert('Changes could not be saved. Please try again.');
+    } catch (err: any) {
+      const errMsg = err?.message || '';
+      const isAuth =
+        errMsg.includes('Unauthorized') ||
+        errMsg.includes('401') ||
+        errMsg.includes('expired') ||
+        errMsg.includes('kedaluwarsa');
+
+      if (isAuth) {
+        setReauthError('Sesi login admin telah berakhir. Masukkan kata sandi admin Anda di bawah untuk memperbarui sesi:');
+        setAuthExpiredModal({
+          isOpen: true,
+          pendingAction: async () => {
+            await saveCamera(toSave);
+            alert('Perubahan spesifikasi kamera berhasil disimpan.');
+            setAdminTab('cameras');
+          },
+        });
+      } else {
+        alert(errMsg || 'Perubahan spesifikasi kamera tidak dapat disimpan. Silakan coba lagi.');
+      }
     }
   };
 
@@ -1018,10 +1161,12 @@ export const AdminCMS: React.FC = () => {
                   ) : (
                     articles
                       .filter((a) => {
+                        const term = (searchTerm || '').toLowerCase();
                         const matchesSearch = 
-                          a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          a.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          a.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+                          !term ||
+                          (a.title || '').toLowerCase().includes(term) ||
+                          (a.slug || '').toLowerCase().includes(term) ||
+                          (a.excerpt || '').toLowerCase().includes(term);
                         const matchesStatus = activeFilterStatus === 'all' || a.status === activeFilterStatus;
                         const matchesCategory = activeFilterCategory === 'all' || a.category === activeFilterCategory;
                         return matchesSearch && matchesStatus && matchesCategory;
@@ -2355,7 +2500,7 @@ export const AdminCMS: React.FC = () => {
             <div className="space-y-6 pt-4 border-t border-[#EEEBE6]">
               <SeoToolkitEditorWidget
                 title={articleForm.title}
-                focusKeyword={articleForm.seo?.focusKeyword || articleForm.title.split(' ')[0] || ''}
+                focusKeyword={articleForm.seo?.focusKeyword || (articleForm.title || '').split(' ')[0] || ''}
                 contentSnippet={
                   articleForm.blocks?.map((b) => b.text || b.headingText || b.quoteText || '').join(' ') ||
                   articleForm.excerpt ||
@@ -2483,12 +2628,12 @@ export const AdminCMS: React.FC = () => {
             {/* Cameras Table */}
             {(() => {
               const filteredCams = cameras.filter((cam) => {
-                const query = cameraSearchTerm.toLowerCase();
+                const query = (cameraSearchTerm || '').toLowerCase();
                 const matchesSearch =
                   !query ||
-                  cam.name.toLowerCase().includes(query) ||
-                  cam.brand.toLowerCase().includes(query) ||
-                  cam.specs?.sensor?.toLowerCase().includes(query);
+                  (cam.name || '').toLowerCase().includes(query) ||
+                  (cam.brand || '').toLowerCase().includes(query) ||
+                  (cam.specs?.sensor || '').toLowerCase().includes(query);
                 const matchesBrand = cameraFilterBrand === 'all' || cam.brand === cameraFilterBrand;
                 const camStatus = cam.status ?? 'published';
                 const matchesStatus = cameraFilterStatus === 'all' || camStatus === cameraFilterStatus;
@@ -3760,6 +3905,99 @@ export const AdminCMS: React.FC = () => {
                   <span>Ya, Hapus Sekarang</span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* RE-AUTHENTICATION MODAL FOR EXPIRED SESSIONS */}
+        {authExpiredModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-[#141414] text-white border border-[#2A2A2A] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 text-left">
+              <div className="flex items-center justify-between pb-3 border-b border-[#262626]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-base font-semibold text-white">
+                      Verifikasi Sesi Admin
+                    </h3>
+                    <p className="text-[11px] text-[#888]">
+                      Sesi keamanan Anda telah berakhir
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthExpiredModal({ isOpen: false })}
+                  className="text-[#777] hover:text-white p-1 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#AAA] leading-relaxed">
+                Untuk menjaga keamanan data dan memastikan perubahan Anda tidak hilang, silakan masukkan kata sandi admin Anda untuk memperbarui sesi dan melanjutkan penyimpanan secara otomatis.
+              </p>
+
+              {reauthError && (
+                <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-xs text-red-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+                  <span>{reauthError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleReauthenticate} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-medium text-[#888] uppercase tracking-wider">
+                    Email Akun Admin
+                  </label>
+                  <input
+                    type="email"
+                    readOnly
+                    value={adminAccount.email || 'fujifinderbusiness@gmail.com'}
+                    className="w-full bg-[#1A1A1A] border border-[#2E2E2E] text-[#888] rounded-xl px-3.5 py-2 text-xs focus:outline-none cursor-not-allowed"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-medium text-[#888] uppercase tracking-wider">
+                    Kata Sandi Admin
+                  </label>
+                  <input
+                    type="password"
+                    autoFocus
+                    value={reauthPassword}
+                    onChange={(e) => setReauthPassword(e.target.value)}
+                    placeholder="Masukkan kata sandi..."
+                    className="w-full bg-[#1E1E1E] border border-[#3A3A3A] focus:border-white text-white rounded-xl px-3.5 py-2.5 text-xs placeholder:text-[#666] focus:outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthExpiredModal({ isOpen: false })}
+                    className="px-4 py-2 border border-[#333] hover:border-[#555] text-xs font-medium text-[#AAA] hover:text-white rounded-xl transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isReauthenticating}
+                    className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-semibold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md active:scale-98 disabled:opacity-50"
+                  >
+                    {isReauthenticating ? (
+                      <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Verifikasi & Simpan</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
