@@ -1011,7 +1011,8 @@ async function requireAdminAuth(req: Request, res: Response, next: any) {
  * Returns only published pages with publishedSections, published cameras, published articles, and site settings.
  * Includes ETag and cache headers for reliable invalidation.
  */
-app.get('/api/site/published', (req: Request, res: Response) => {
+app.get('/api/site/published', async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const data = cmsStore.getPublishedSiteData();
   const etag = `"v${data.published_version}"`;
 
@@ -1100,7 +1101,8 @@ app.post('/api/affiliate/click', (req: Request, res: Response) => {
 /**
  * 7. ADMIN: Get full dataset (drafts, revisions, clicks, full builder pages)
  */
-app.get('/api/site/admin', requireAdminAuth, (req: Request, res: Response) => {
+app.get('/api/site/admin', requireAdminAuth, async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const adminData = cmsStore.getAdminSiteData();
   res.set('Cache-Control', 'no-store');
   return res.json({ success: true, ...adminData });
@@ -1289,12 +1291,14 @@ app.post('/api/builder/sync', requireAdminAuth, (req: Request, res: Response) =>
 /**
  * 18. ARTICLES CRUD (Load, Create, Update, Delete)
  */
-app.get('/api/articles', (req: Request, res: Response) => {
+app.get('/api/articles', async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const articles = cmsStore.getArticles();
   return res.json({ success: true, articles });
 });
 
-app.get('/api/articles/:id', (req: Request, res: Response) => {
+app.get('/api/articles/:id', async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const article = cmsStore.getArticleById(req.params.id);
   if (!article) {
     return res.status(404).json({ success: false, error: 'Article not found.' });
@@ -1302,51 +1306,53 @@ app.get('/api/articles/:id', (req: Request, res: Response) => {
   return res.json({ success: true, article });
 });
 
-app.post('/api/articles', requireAdminAuth, (req: Request, res: Response) => {
+app.post('/api/articles', requireAdminAuth, async (req: Request, res: Response) => {
   const { article } = req.body || {};
   const artToSave = article || req.body;
   if (!artToSave || !artToSave.id || !artToSave.title) {
     return res.status(400).json({ success: false, error: 'Valid article object is required.' });
   }
-  const result = cmsStore.saveArticle(artToSave);
+  const result = await cmsStore.saveArticle(artToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.put('/api/articles/:id', requireAdminAuth, (req: Request, res: Response) => {
+app.put('/api/articles/:id', requireAdminAuth, async (req: Request, res: Response) => {
   const { article } = req.body || {};
   const artToSave = article || req.body;
   if (!artToSave || !artToSave.title) {
     return res.status(400).json({ success: false, error: 'Valid article object is required.' });
   }
   artToSave.id = req.params.id || artToSave.id;
-  const result = cmsStore.saveArticle(artToSave);
+  const result = await cmsStore.saveArticle(artToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.put('/api/articles', requireAdminAuth, (req: Request, res: Response) => {
+app.put('/api/articles', requireAdminAuth, async (req: Request, res: Response) => {
   const { article } = req.body || {};
   const artToSave = article || req.body;
   if (!artToSave || !artToSave.id || !artToSave.title) {
     return res.status(400).json({ success: false, error: 'Valid article object is required.' });
   }
-  const result = cmsStore.saveArticle(artToSave);
+  const result = await cmsStore.saveArticle(artToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.delete('/api/articles/:id', requireAdminAuth, (req: Request, res: Response) => {
-  const result = cmsStore.deleteArticle(req.params.id);
+app.delete('/api/articles/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  const result = await cmsStore.deleteArticle(req.params.id);
   return res.json({ success: true, message: 'Article deleted successfully.', ...result });
 });
 
 /**
  * 19. CAMERAS CRUD (Load, Create, Update, Delete)
  */
-app.get('/api/cameras', (req: Request, res: Response) => {
+app.get('/api/cameras', async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const cameras = cmsStore.getCameras();
   return res.json({ success: true, cameras });
 });
 
-app.get('/api/cameras/:id', (req: Request, res: Response) => {
+app.get('/api/cameras/:id', async (req: Request, res: Response) => {
+  await cmsStore.ensureInitialized();
   const camera = cmsStore.getCameraById(req.params.id);
   if (!camera) {
     return res.status(404).json({ success: false, error: 'Camera not found.' });
@@ -1354,39 +1360,39 @@ app.get('/api/cameras/:id', (req: Request, res: Response) => {
   return res.json({ success: true, camera });
 });
 
-app.post('/api/cameras', requireAdminAuth, (req: Request, res: Response) => {
+app.post('/api/cameras', requireAdminAuth, async (req: Request, res: Response) => {
   const { camera } = req.body || {};
   const camToSave = camera || req.body;
   if (!camToSave || !camToSave.id || !camToSave.name) {
     return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
   }
-  const result = cmsStore.saveCamera(camToSave);
+  const result = await cmsStore.saveCamera(camToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.put('/api/cameras/:id', requireAdminAuth, (req: Request, res: Response) => {
+app.put('/api/cameras/:id', requireAdminAuth, async (req: Request, res: Response) => {
   const { camera } = req.body || {};
   const camToSave = camera || req.body;
   if (!camToSave || !camToSave.name) {
     return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
   }
   camToSave.id = req.params.id || camToSave.id;
-  const result = cmsStore.saveCamera(camToSave);
+  const result = await cmsStore.saveCamera(camToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.put('/api/cameras', requireAdminAuth, (req: Request, res: Response) => {
+app.put('/api/cameras', requireAdminAuth, async (req: Request, res: Response) => {
   const { camera } = req.body || {};
   const camToSave = camera || req.body;
   if (!camToSave || !camToSave.id || !camToSave.name) {
     return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
   }
-  const result = cmsStore.saveCamera(camToSave);
+  const result = await cmsStore.saveCamera(camToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-app.delete('/api/cameras/:id', requireAdminAuth, (req: Request, res: Response) => {
-  const result = cmsStore.deleteCamera(req.params.id);
+app.delete('/api/cameras/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  const result = await cmsStore.deleteCamera(req.params.id);
   return res.json({ success: true, message: 'Camera deleted successfully.', ...result });
 });
 

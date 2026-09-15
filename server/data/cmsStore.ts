@@ -673,7 +673,7 @@ class CMSStore {
   // CORE CMS ENTITY OPERATIONS (ARTICLES, CAMERAS, SETTINGS)
   // -------------------------------------------------------------
 
-  public saveArticle(article: Article): { article: Article; published_version: number } {
+  public async saveArticle(article: Article): Promise<{ article: Article; published_version: number }> {
     const cleanArticle: Article = {
       ...article,
       id: article.id || `art-${Date.now()}`,
@@ -734,28 +734,32 @@ class CMSStore {
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
-    // Asynchronously synchronize with Supabase articles table
-    supabaseService.saveArticle(cleanArticle).catch((err) => {
-      console.error('[CMSStore] Background Supabase article sync failed:', err);
-    });
+    // Synchronize with Supabase articles table (awaited for serverless runtime reliability)
+    try {
+      await supabaseService.saveArticle(cleanArticle);
+    } catch (err) {
+      console.error('[CMSStore] Supabase article sync error:', err);
+    }
 
     return { article: cleanArticle, published_version: this.data.version };
   }
 
-  public deleteArticle(id: string): { published_version: number } {
+  public async deleteArticle(id: string): Promise<{ published_version: number }> {
     this.data.articles = this.data.articles.filter((a) => a.id !== id);
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
     // Synchronize delete with Supabase
-    supabaseService.deleteArticle(id).catch((err) => {
-      console.error('[CMSStore] Background Supabase article delete failed:', err);
-    });
+    try {
+      await supabaseService.deleteArticle(id);
+    } catch (err) {
+      console.error('[CMSStore] Supabase article delete error:', err);
+    }
 
     return { published_version: this.data.version };
   }
 
-  public saveCamera(camera: CameraProduct): { camera: CameraProduct; published_version: number } {
+  public async saveCamera(camera: CameraProduct): Promise<{ camera: CameraProduct; published_version: number }> {
     const index = this.data.cameras.findIndex((c) => c.id === camera.id);
     if (index >= 0) {
       this.data.cameras[index] = camera;
@@ -766,23 +770,27 @@ class CMSStore {
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
-    // Asynchronously synchronize with Supabase cameras table
-    supabaseService.saveCamera(camera).catch((err) => {
-      console.error('[CMSStore] Background Supabase camera sync failed:', err);
-    });
+    // Synchronize with Supabase cameras table (awaited for serverless runtime reliability)
+    try {
+      await supabaseService.saveCamera(camera);
+    } catch (err) {
+      console.error('[CMSStore] Supabase camera sync error:', err);
+    }
 
     return { camera, published_version: this.data.version };
   }
 
-  public deleteCamera(id: string): { published_version: number } {
+  public async deleteCamera(id: string): Promise<{ published_version: number }> {
     this.data.cameras = this.data.cameras.filter((c) => c.id !== id);
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
     // Synchronize delete with Supabase
-    supabaseService.deleteCamera(id).catch((err) => {
-      console.error('[CMSStore] Background Supabase camera delete failed:', err);
-    });
+    try {
+      await supabaseService.deleteCamera(id);
+    } catch (err) {
+      console.error('[CMSStore] Supabase camera delete error:', err);
+    }
 
     return { published_version: this.data.version };
   }
@@ -883,6 +891,15 @@ class CMSStore {
     return this.data.reusableSections || [];
   }
 
+  private supabaseInitPromise: Promise<void> | null = null;
+
+  public async ensureInitialized(): Promise<void> {
+    if (!this.supabaseInitPromise) {
+      this.supabaseInitPromise = this.initFromSupabase();
+    }
+    return this.supabaseInitPromise;
+  }
+
   /**
    * Load data directly from Supabase tables into CMSStore memory & cache
    */
@@ -896,9 +913,18 @@ class CMSStore {
       ]);
 
       // Supabase is single source of truth for these tables
-      this.data.cameras = cameras;
-      this.data.articles = articles;
-      this.data.mediaAssets = mediaAssets;
+      if (articles.length > 0) {
+        this.data.articles = articles;
+      }
+      if (cameras.length > 0) {
+        const camMap = new Map<string, CameraProduct>();
+        initialCameras.forEach((c) => camMap.set(c.id, c));
+        cameras.forEach((c) => camMap.set(c.id, c));
+        this.data.cameras = Array.from(camMap.values());
+      }
+      if (mediaAssets.length > 0) {
+        this.data.mediaAssets = mediaAssets;
+      }
       if (affiliateClicks.length > 0) {
         this.data.affiliateClicks = affiliateClicks;
       }
