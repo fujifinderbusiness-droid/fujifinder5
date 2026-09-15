@@ -24,41 +24,10 @@ export default async function handler(req: Request, res: Response) {
   // Ensure Supabase stores are loaded
   await ensureStoresInitialized();
 
-  // Robust path normalization across all Vercel execution contexts
-  let targetPath = '';
-
-  if (req.query && req.query.path) {
-    const segments = Array.isArray(req.query.path) ? req.query.path.join('/') : String(req.query.path);
-    targetPath = `/api/${segments}`;
-  } else if (req.headers['x-matched-path']) {
-    targetPath = req.headers['x-matched-path'] as string;
-  } else if (req.headers['x-forwarded-uri']) {
-    targetPath = req.headers['x-forwarded-uri'] as string;
-  } else if (req.url) {
-    targetPath = req.url;
-  }
-
-  if (targetPath) {
-    // Strip domain/origin if full URL was provided
-    if (targetPath.startsWith('http://') || targetPath.startsWith('https://')) {
-      try {
-        const u = new URL(targetPath);
-        targetPath = u.pathname + u.search;
-      } catch {}
-    }
-
-    // Ensure it starts with /api
-    if (!targetPath.startsWith('/api')) {
-      targetPath = '/api' + (targetPath.startsWith('/') ? targetPath : '/' + targetPath);
-    }
-
-    // Preserve query parameters
-    const originalQueryIndex = (req.url || '').indexOf('?');
-    if (originalQueryIndex >= 0 && !targetPath.includes('?')) {
-      targetPath += req.url.slice(originalQueryIndex);
-    }
-
-    req.url = targetPath;
+  // If Vercel rewrote the URL and stripped '/api' (e.g. req.url is '/cameras' instead of '/api/cameras'),
+  // normalize it so Express routes match seamlessly
+  if (req.url && !req.url.startsWith('/api')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
   }
 
   return (app as any)(req, res);

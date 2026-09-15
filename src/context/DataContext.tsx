@@ -240,54 +240,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-// -------------------------------------------------------------
-// DIRECT SUPABASE FALLBACK LOADER
-// -------------------------------------------------------------
-
-async function fetchArticlesDirectFromSupabase(): Promise<Article[]> {
-  try {
-    const { data, error } = await supabase.from('articles').select('*');
-    if (error || !data || data.length === 0) return [];
-    return data.map((row: any): Article => {
-      const raw = row.data && typeof row.data === 'object' ? row.data : {};
-      const authorName = typeof row.author === 'string' ? row.author : (raw.author?.name || 'FujiFinder Editorial');
-      return {
-        id: row.id,
-        slug: row.slug || raw.slug || row.id,
-        title: row.title || raw.title || 'Untitled Article',
-        subtitle: row.subtitle || raw.subtitle || '',
-        excerpt: row.excerpt || raw.excerpt || '',
-        category: row.category || raw.category || 'Mirrorless',
-        author: {
-          name: authorName,
-          role: raw.author?.role || 'Staff Writer',
-          avatar: raw.author?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-          bio: raw.author?.bio || '',
-        },
-        publishedAt: row.published_at || raw.publishedAt || new Date().toISOString().split('T')[0],
-        updatedAt: row.updated_at || raw.updatedAt || new Date().toISOString().split('T')[0],
-        readTimeMinutes: row.read_time_minutes || raw.readTimeMinutes || 5,
-        coverImage: row.cover_image || raw.coverImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80',
-        featured: Boolean(row.featured ?? raw.featured),
-        blocks: Array.isArray(row.blocks) && row.blocks.length > 0 ? row.blocks : (Array.isArray(raw.blocks) ? raw.blocks : []),
-        featuredCameraIds: Array.isArray(raw.featuredCameraIds) ? raw.featuredCameraIds : (row.related_camera_id ? [row.related_camera_id] : []),
-        relatedArticleSlugs: Array.isArray(raw.relatedArticleSlugs) ? raw.relatedArticleSlugs : [],
-        seo: row.seo && Object.keys(row.seo).length > 0 ? row.seo : (raw.seo || { metaTitle: row.title }),
-        status: (row.status || raw.status || 'published') as any,
-        views: typeof row.view_count === 'number' ? row.view_count : (raw.views || 0),
-        affiliateClicks: raw.affiliateClicks || 0,
-        isPopularNow: Boolean(raw.isPopularNow),
-        isTrending: Boolean(raw.isTrending),
-        isHeroFeatured: Boolean(raw.isHeroFeatured),
-        showOnLandingPage: Boolean(raw.showOnLandingPage ?? true),
-      };
-    });
-  } catch (e) {
-    console.warn('[DataContext] Direct Supabase articles fetch notice:', e);
-    return [];
-  }
-}
-
   // -------------------------------------------------------------
   // DATA FETCHING & SYNCHRONIZATION FROM SERVER BACKEND
   // -------------------------------------------------------------
@@ -303,14 +255,7 @@ async function fetchArticlesDirectFromSupabase(): Promise<Article[]> {
         try {
           const adminData = await fetchAdminSiteData(true);
           setCameras(adminData.cameras);
-          if (adminData.articles && adminData.articles.length > 0) {
-            setArticles(adminData.articles);
-          } else {
-            const sbArticles = await fetchArticlesDirectFromSupabase();
-            if (sbArticles.length > 0) {
-              setArticles(sbArticles);
-            }
-          }
+          setArticles(adminData.articles);
           setMediaAssets(adminData.mediaAssets);
           setSiteSettings(adminData.siteSettings);
           setHomeSettings(adminData.homeSettings);
@@ -335,26 +280,13 @@ async function fetchArticlesDirectFromSupabase(): Promise<Article[]> {
       // Public visitor: fetch published database snapshot
       const pubData = await fetchPublishedSiteData();
       setCameras(pubData.cameras);
-      if (pubData.articles && pubData.articles.length > 0) {
-        setArticles(pubData.articles);
-      } else {
-        const sbArticles = await fetchArticlesDirectFromSupabase();
-        if (sbArticles.length > 0) {
-          setArticles(sbArticles);
-        }
-      }
+      setArticles(pubData.articles);
       setSiteSettings(pubData.siteSettings);
       setHomeSettings(pubData.homeSettings);
       setPublishedVersion(pubData.published_version);
       setCachedPublishedVersion(pubData.published_version);
     } catch (err: any) {
-      console.warn('[DataContext] Failed to fetch data from server, attempting direct Supabase query:', err?.message || err);
-      try {
-        const sbArticles = await fetchArticlesDirectFromSupabase();
-        if (sbArticles.length > 0) {
-          setArticles(sbArticles);
-        }
-      } catch {}
+      console.warn('[DataContext] Failed to fetch data from server:', err?.message || err);
       setSyncError('Could not sync with server.');
     } finally {
       setIsSyncing(false);
@@ -630,52 +562,8 @@ async function fetchArticlesDirectFromSupabase(): Promise<Article[]> {
       window.dispatchEvent(new CustomEvent('cms:published-updated'));
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
-      console.warn('[DataContext] Primary saveArticle API failed, executing direct Supabase upsert fallback:', err);
-      try {
-        const authorStr = typeof sanitizedArticle.author === 'string'
-          ? sanitizedArticle.author
-          : (sanitizedArticle.author?.name || 'FujiFinder Editorial');
-
-        const payload = {
-          id: sanitizedArticle.id,
-          slug: sanitizedArticle.slug,
-          title: sanitizedArticle.title,
-          category: sanitizedArticle.category,
-          status: sanitizedArticle.status || 'published',
-          author: authorStr,
-          subtitle: sanitizedArticle.subtitle || null,
-          excerpt: sanitizedArticle.excerpt || null,
-          featured: Boolean(sanitizedArticle.featured),
-          cover_image: sanitizedArticle.coverImage || null,
-          read_time_minutes: sanitizedArticle.readTimeMinutes || 5,
-          blocks: sanitizedArticle.blocks || [],
-          seo: sanitizedArticle.seo || {},
-          related_camera_id: sanitizedArticle.featuredCameraIds?.[0] || null,
-          tags: sanitizedArticle.seo?.secondaryKeywords || [],
-          view_count: sanitizedArticle.views || 0,
-          published_at: sanitizedArticle.publishedAt || new Date().toISOString(),
-          data: sanitizedArticle,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { error: sbErr } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
-        if (sbErr) throw sbErr;
-
-        setArticles((prev) => {
-          const idx = prev.findIndex((a) => a.id === sanitizedArticle.id);
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = sanitizedArticle;
-            return updated;
-          }
-          return [sanitizedArticle, ...prev];
-        });
-        window.dispatchEvent(new CustomEvent('cms:published-updated'));
-        return { success: true, message: 'Artikel berhasil disimpan ke Supabase database.' };
-      } catch (sbError: any) {
-        console.error('[DataContext] Direct Supabase save fallback also failed:', sbError);
-        throw new Error(err.message || sbError.message || 'Perubahan artikel gagal disimpan. Silakan coba lagi.');
-      }
+      console.error('Failed to save article to backend:', err);
+      throw new Error(err.message || 'Perubahan artikel gagal disimpan. Silakan coba lagi.');
     }
   };
 
@@ -686,17 +574,8 @@ async function fetchArticlesDirectFromSupabase(): Promise<Article[]> {
       window.dispatchEvent(new CustomEvent('cms:published-updated'));
       return { success: true, message: 'Changes published successfully.' };
     } catch (err: any) {
-      console.warn('[DataContext] Primary deleteArticle API failed, attempting direct Supabase delete fallback:', err);
-      try {
-        const { error: sbErr } = await supabase.from('articles').delete().eq('id', id);
-        if (sbErr) throw sbErr;
-        setArticles((prev) => prev.filter((a) => a.id !== id));
-        window.dispatchEvent(new CustomEvent('cms:published-updated'));
-        return { success: true, message: 'Artikel berhasil dihapus dari database.' };
-      } catch (sbError: any) {
-        console.error('[DataContext] Direct Supabase delete fallback failed:', sbError);
-        throw new Error(err.message || sbError.message || 'Gagal menghapus artikel. Silakan coba lagi.');
-      }
+      console.error('Failed to delete article on backend:', err);
+      throw new Error(err.message || 'Gagal menghapus artikel. Silakan coba lagi.');
     }
   };
 

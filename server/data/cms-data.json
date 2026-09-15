@@ -1,7 +1,7 @@
 {
-  "version": 11,
-  "published_at": "2026-09-15T07:35:01.156Z",
-  "updated_at": "2026-09-15T07:35:01.156Z",
+  "version": 9,
+  "published_at": "2026-09-14T00:07:53.285Z",
+  "updated_at": "2026-09-14T00:07:53.285Z",
   "pages": [
     {
       "id": "page-landing",
@@ -1185,6 +1185,42 @@
   ],
   "articles": [
     {
+      "id": "art-fuji-field-test",
+      "slug": "fujifilm-x100vi-field-review",
+      "title": "Fujifilm X100VI In-Depth Field Review",
+      "subtitle": "",
+      "excerpt": "",
+      "category": "Mirrorless",
+      "author": {
+        "name": "FujiFinder Editorial",
+        "role": "Senior Optical Reviewer",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+        "bio": "Camera reviewer and documentary photographer."
+      },
+      "publishedAt": "2026-09-12T07:03:54.293059+00:00",
+      "updatedAt": "2026-09-11T07:35:06.200326+00:00",
+      "readTimeMinutes": 5,
+      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+      "featured": false,
+      "blocks": [
+        {
+          "id": "b1",
+          "text": "Field review content...",
+          "type": "paragraph"
+        }
+      ],
+      "featuredCameraIds": [],
+      "relatedArticleSlugs": [],
+      "seo": {
+        "title": "",
+        "keywords": [],
+        "description": ""
+      },
+      "status": "published",
+      "views": 0,
+      "affiliateClicks": 0
+    },
+    {
       "id": "art-1789344545137",
       "slug": "efhiahfif",
       "title": "efhiahfif",
@@ -1238,42 +1274,6 @@
       },
       "status": "published",
       "views": 120,
-      "affiliateClicks": 0
-    },
-    {
-      "id": "art-fuji-field-test",
-      "slug": "fujifilm-x100vi-field-review",
-      "title": "Fujifilm X100VI In-Depth Field Review",
-      "subtitle": "",
-      "excerpt": "",
-      "category": "Mirrorless",
-      "author": {
-        "name": "FujiFinder Editorial",
-        "role": "Senior Optical Reviewer",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-        "bio": "Camera reviewer and documentary photographer."
-      },
-      "publishedAt": "2026-09-12T07:03:54.293059+00:00",
-      "updatedAt": "2026-09-15T07:43:27.002156+00:00",
-      "readTimeMinutes": 5,
-      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
-      "featured": false,
-      "blocks": [
-        {
-          "id": "b1",
-          "text": "Field review content...",
-          "type": "paragraph"
-        }
-      ],
-      "featuredCameraIds": [],
-      "relatedArticleSlugs": [],
-      "seo": {
-        "title": "",
-        "keywords": [],
-        "description": ""
-      },
-      "status": "published",
-      "views": 0,
       "affiliateClicks": 0
     }
   ],
