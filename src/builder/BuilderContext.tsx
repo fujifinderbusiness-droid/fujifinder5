@@ -33,6 +33,7 @@ import {
   saveGlobalDesignApi,
   saveReusableSectionsApi,
   getAdminToken,
+  setAdminToken,
 } from '../services/cmsApi';
 
 interface BuilderContextType {
@@ -141,20 +142,25 @@ export const BuilderProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const token = getAdminToken();
     try {
       if (token) {
-        const adminData = await fetchAdminSiteData();
-        if (adminData.pages && adminData.pages.length > 0) {
-          setPages(adminData.pages);
+        try {
+          const adminData = await fetchAdminSiteData(true);
+          if (adminData.pages && adminData.pages.length > 0) {
+            setPages(adminData.pages);
+          }
+          if (adminData.globalDesign) {
+            setGlobalDesign(adminData.globalDesign);
+          }
+          if (adminData.reusableSections) {
+            setReusableSections(adminData.reusableSections);
+          }
+          if (adminData.revisions) {
+            setRevisions(adminData.revisions);
+          }
+          return;
+        } catch {
+          // Token expired or invalid, clear token and fall through to public published data
+          setAdminToken(null);
         }
-        if (adminData.globalDesign) {
-          setGlobalDesign(adminData.globalDesign);
-        }
-        if (adminData.reusableSections) {
-          setReusableSections(adminData.reusableSections);
-        }
-        if (adminData.revisions) {
-          setRevisions(adminData.revisions);
-        }
-        return;
       }
 
       // Public visitor

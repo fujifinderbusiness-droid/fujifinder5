@@ -253,7 +253,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         // Admin is authenticated: load full dataset
         try {
-          const adminData = await fetchAdminSiteData();
+          const adminData = await fetchAdminSiteData(true);
           setCameras(adminData.cameras);
           setArticles(adminData.articles);
           setMediaAssets(adminData.mediaAssets);
@@ -267,19 +267,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCachedPublishedVersion(adminData.published_version);
           return;
         } catch (adminErr: any) {
-          console.warn('[DataContext] Admin data fetch failed, checking error:', adminErr);
-          const isAuthError =
-            adminErr?.message?.includes('401') ||
-            adminErr?.message?.includes('Unauthorized') ||
-            adminErr?.message?.includes('kedaluwarsa') ||
-            adminErr?.message?.includes('expired');
-          if (isAuthError) {
-            setAdminUser(null);
-            setAdminToken(null);
-            try {
-              localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
-            } catch {}
-          }
+          // Token is expired or invalid - reset token and admin session cleanly
+          setAdminUser(null);
+          setAdminToken(null);
+          try {
+            localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+          } catch {}
+          // Continue to fallback below (fetchPublishedSiteData)
         }
       }
 
@@ -292,7 +286,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPublishedVersion(pubData.published_version);
       setCachedPublishedVersion(pubData.published_version);
     } catch (err: any) {
-      console.error('[DataContext] Failed to fetch data from server:', err);
+      console.warn('[DataContext] Failed to fetch data from server:', err?.message || err);
       setSyncError('Could not sync with server.');
     } finally {
       setIsSyncing(false);

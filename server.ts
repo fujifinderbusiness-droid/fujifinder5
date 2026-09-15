@@ -8,6 +8,7 @@ import { cmsStore } from './server/data/cmsStore';
 import { emailService } from './server/email/EmailService';
 import { verifyEmailAddress } from './server/utils/emailValidator';
 import { EmailCampaign, EmailTemplate } from './src/types/newsletterTypes';
+import { MediaAsset } from './src/types';
 import { supabaseService } from './server/db/supabaseClient';
 
 
@@ -16,8 +17,20 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Enable CORS for all incoming API calls from production and preview domains
+app.use((req: Request, res: Response, next: any) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Configure body-parser with high limit for base64 image uploads and camera specs
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Helper to determine the application public base URL dynamically
 function getBaseUrl(req: Request): string {
@@ -1208,24 +1221,56 @@ app.delete('/api/pages/:id', requireAdminAuth, (req: Request, res: Response) => 
 /**
  * 15. ADMIN: Save global design settings
  */
+app.get('/api/builder/global-design', (req: Request, res: Response) => {
+  const globalDesign = cmsStore.getGlobalDesign();
+  return res.json({ success: true, globalDesign });
+});
+
 app.post('/api/builder/global-design', requireAdminAuth, (req: Request, res: Response) => {
   const { globalDesign } = req.body || {};
-  if (!globalDesign) {
+  const design = globalDesign || req.body;
+  if (!design) {
     return res.status(400).json({ success: false, error: 'globalDesign is required.' });
   }
-  const result = cmsStore.saveGlobalDesign(globalDesign);
+  const result = cmsStore.saveGlobalDesign(design);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.put('/api/builder/global-design', requireAdminAuth, (req: Request, res: Response) => {
+  const { globalDesign } = req.body || {};
+  const design = globalDesign || req.body;
+  if (!design) {
+    return res.status(400).json({ success: false, error: 'globalDesign is required.' });
+  }
+  const result = cmsStore.saveGlobalDesign(design);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
 /**
  * 16. ADMIN: Save reusable sections
  */
+app.get('/api/builder/reusable-sections', (req: Request, res: Response) => {
+  const reusableSections = cmsStore.getReusableSections();
+  return res.json({ success: true, reusableSections });
+});
+
 app.post('/api/builder/reusable-sections', requireAdminAuth, (req: Request, res: Response) => {
   const { sections } = req.body || {};
-  if (!Array.isArray(sections)) {
+  const secList = Array.isArray(sections) ? sections : req.body;
+  if (!Array.isArray(secList)) {
     return res.status(400).json({ success: false, error: 'sections array is required.' });
   }
-  const result = cmsStore.saveReusableSections(sections);
+  const result = cmsStore.saveReusableSections(secList);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.put('/api/builder/reusable-sections', requireAdminAuth, (req: Request, res: Response) => {
+  const { sections } = req.body || {};
+  const secList = Array.isArray(sections) ? sections : req.body;
+  if (!Array.isArray(secList)) {
+    return res.status(400).json({ success: false, error: 'sections array is required.' });
+  }
+  const result = cmsStore.saveReusableSections(secList);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
@@ -1242,78 +1287,180 @@ app.post('/api/builder/sync', requireAdminAuth, (req: Request, res: Response) =>
 });
 
 /**
- * 18. ADMIN: Save / Publish Article
+ * 18. ARTICLES CRUD (Load, Create, Update, Delete)
  */
+app.get('/api/articles', (req: Request, res: Response) => {
+  const articles = cmsStore.getArticles();
+  return res.json({ success: true, articles });
+});
+
+app.get('/api/articles/:id', (req: Request, res: Response) => {
+  const article = cmsStore.getArticleById(req.params.id);
+  if (!article) {
+    return res.status(404).json({ success: false, error: 'Article not found.' });
+  }
+  return res.json({ success: true, article });
+});
+
 app.post('/api/articles', requireAdminAuth, (req: Request, res: Response) => {
   const { article } = req.body || {};
-  if (!article || !article.id || !article.title) {
+  const artToSave = article || req.body;
+  if (!artToSave || !artToSave.id || !artToSave.title) {
     return res.status(400).json({ success: false, error: 'Valid article object is required.' });
   }
-  const result = cmsStore.saveArticle(article);
+  const result = cmsStore.saveArticle(artToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-/**
- * 19. ADMIN: Delete Article
- */
+app.put('/api/articles/:id', requireAdminAuth, (req: Request, res: Response) => {
+  const { article } = req.body || {};
+  const artToSave = article || req.body;
+  if (!artToSave || !artToSave.title) {
+    return res.status(400).json({ success: false, error: 'Valid article object is required.' });
+  }
+  artToSave.id = req.params.id || artToSave.id;
+  const result = cmsStore.saveArticle(artToSave);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.put('/api/articles', requireAdminAuth, (req: Request, res: Response) => {
+  const { article } = req.body || {};
+  const artToSave = article || req.body;
+  if (!artToSave || !artToSave.id || !artToSave.title) {
+    return res.status(400).json({ success: false, error: 'Valid article object is required.' });
+  }
+  const result = cmsStore.saveArticle(artToSave);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
 app.delete('/api/articles/:id', requireAdminAuth, (req: Request, res: Response) => {
   const result = cmsStore.deleteArticle(req.params.id);
   return res.json({ success: true, message: 'Article deleted successfully.', ...result });
 });
 
 /**
- * 20. ADMIN: Save / Publish Camera (Product)
+ * 19. CAMERAS CRUD (Load, Create, Update, Delete)
  */
+app.get('/api/cameras', (req: Request, res: Response) => {
+  const cameras = cmsStore.getCameras();
+  return res.json({ success: true, cameras });
+});
+
+app.get('/api/cameras/:id', (req: Request, res: Response) => {
+  const camera = cmsStore.getCameraById(req.params.id);
+  if (!camera) {
+    return res.status(404).json({ success: false, error: 'Camera not found.' });
+  }
+  return res.json({ success: true, camera });
+});
+
 app.post('/api/cameras', requireAdminAuth, (req: Request, res: Response) => {
   const { camera } = req.body || {};
-  if (!camera || !camera.id || !camera.name) {
+  const camToSave = camera || req.body;
+  if (!camToSave || !camToSave.id || !camToSave.name) {
     return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
   }
-  const result = cmsStore.saveCamera(camera);
+  const result = cmsStore.saveCamera(camToSave);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-/**
- * 21. ADMIN: Delete Camera
- */
+app.put('/api/cameras/:id', requireAdminAuth, (req: Request, res: Response) => {
+  const { camera } = req.body || {};
+  const camToSave = camera || req.body;
+  if (!camToSave || !camToSave.name) {
+    return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
+  }
+  camToSave.id = req.params.id || camToSave.id;
+  const result = cmsStore.saveCamera(camToSave);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.put('/api/cameras', requireAdminAuth, (req: Request, res: Response) => {
+  const { camera } = req.body || {};
+  const camToSave = camera || req.body;
+  if (!camToSave || !camToSave.id || !camToSave.name) {
+    return res.status(400).json({ success: false, error: 'Valid camera object is required.' });
+  }
+  const result = cmsStore.saveCamera(camToSave);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
 app.delete('/api/cameras/:id', requireAdminAuth, (req: Request, res: Response) => {
   const result = cmsStore.deleteCamera(req.params.id);
   return res.json({ success: true, message: 'Camera deleted successfully.', ...result });
 });
 
 /**
- * 22. ADMIN: Update Site Settings
+ * 20. SITE & HOMEPAGE SETTINGS
  */
+app.get('/api/settings', (req: Request, res: Response) => {
+  const settings = cmsStore.getSiteSettings();
+  return res.json({ success: true, settings, siteSettings: settings });
+});
+
 app.post('/api/settings', requireAdminAuth, (req: Request, res: Response) => {
   const { settings } = req.body || {};
-  if (!settings) {
+  const s = settings || req.body;
+  if (!s) {
     return res.status(400).json({ success: false, error: 'Settings object is required.' });
   }
-  const result = cmsStore.updateSiteSettings(settings);
+  const result = cmsStore.updateSiteSettings(s);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
-/**
- * 23. ADMIN: Update Homepage Settings
- */
+app.put('/api/settings', requireAdminAuth, (req: Request, res: Response) => {
+  const { settings } = req.body || {};
+  const s = settings || req.body;
+  if (!s) {
+    return res.status(400).json({ success: false, error: 'Settings object is required.' });
+  }
+  const result = cmsStore.updateSiteSettings(s);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.get('/api/home-settings', (req: Request, res: Response) => {
+  const settings = cmsStore.getHomeSettings();
+  return res.json({ success: true, settings, homeSettings: settings });
+});
+
 app.post('/api/home-settings', requireAdminAuth, (req: Request, res: Response) => {
   const { settings } = req.body || {};
-  if (!settings) {
+  const s = settings || req.body;
+  if (!s) {
     return res.status(400).json({ success: false, error: 'Homepage settings object is required.' });
   }
-  const result = cmsStore.updateHomeSettings(settings);
+  const result = cmsStore.updateHomeSettings(s);
+  return res.json({ success: true, message: 'Changes published successfully.', ...result });
+});
+
+app.put('/api/home-settings', requireAdminAuth, (req: Request, res: Response) => {
+  const { settings } = req.body || {};
+  const s = settings || req.body;
+  if (!s) {
+    return res.status(400).json({ success: false, error: 'Homepage settings object is required.' });
+  }
+  const result = cmsStore.updateHomeSettings(s);
   return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
 /**
- * 24. ADMIN: Media Assets
+ * 21. MEDIA ASSETS & IMAGE UPLOAD
  */
+app.get('/api/media', requireAdminAuth, (req: Request, res: Response) => {
+  const mediaAssets = cmsStore.getMediaAssets();
+  return res.json({ success: true, mediaAssets, assets: mediaAssets });
+});
+
 app.post('/api/media', requireAdminAuth, (req: Request, res: Response) => {
   const { asset } = req.body || {};
-  if (!asset || !asset.id || !asset.url) {
+  const a = asset || req.body;
+  if (!a || !a.url) {
     return res.status(400).json({ success: false, error: 'Valid media asset is required.' });
   }
-  const created = cmsStore.addMediaAsset(asset);
+  if (!a.id) {
+    a.id = 'm-' + Date.now();
+  }
+  const created = cmsStore.addMediaAsset(a);
   return res.json({ success: true, asset: created });
 });
 
@@ -1322,16 +1469,55 @@ app.delete('/api/media/:id', requireAdminAuth, (req: Request, res: Response) => 
   return res.json({ success: true });
 });
 
+// Image upload handlers for file uploads and base64 images
+const handleImageUpload = (req: Request, res: Response) => {
+  const body = req.body || {};
+  const image = body.image || body.url || body.file || body.data;
+  const title = body.title || body.name || 'Uploaded Media';
+  const category = body.category || 'camera';
+
+  if (!image) {
+    return res.status(400).json({ success: false, error: 'Image data or URL is required.' });
+  }
+
+  const newAsset: MediaAsset = {
+    id: 'm-' + Date.now(),
+    title,
+    url: image,
+    category: (category as any) || 'camera',
+    dimensions: body.dimensions || '1200x800',
+    fileSize: body.fileSize || 'Standard',
+    uploadedAt: new Date().toISOString().split('T')[0],
+  };
+
+  const created = cmsStore.addMediaAsset(newAsset);
+  return res.json({
+    success: true,
+    url: created.url,
+    asset: created,
+    message: 'Image uploaded successfully.',
+  });
+};
+
+app.post('/api/upload', requireAdminAuth, handleImageUpload);
+app.post('/api/upload/image', requireAdminAuth, handleImageUpload);
+app.post('/api/media/upload', requireAdminAuth, handleImageUpload);
+
 /**
- * 25. ADMIN: Update Admin Account
+ * 22. ADMIN: Update Admin Account
  */
 app.post('/api/auth/account', requireAdminAuth, (req: Request, res: Response) => {
   const updated = cmsStore.updateAdminAccount(req.body);
   return res.json({ success: true, message: 'Admin account updated successfully.', account: updated });
 });
 
+app.put('/api/auth/account', requireAdminAuth, (req: Request, res: Response) => {
+  const updated = cmsStore.updateAdminAccount(req.body);
+  return res.json({ success: true, message: 'Admin account updated successfully.', account: updated });
+});
+
 /**
- * 26. ADMIN: Reset to demo state
+ * 23. ADMIN: Reset to demo state
  */
 app.post('/api/site/reset', requireAdminAuth, (req: Request, res: Response) => {
   const result = cmsStore.resetToDemo();
@@ -1491,4 +1677,9 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+export { app };
+
+if (!process.env.VERCEL) {
+  startServer();
+}

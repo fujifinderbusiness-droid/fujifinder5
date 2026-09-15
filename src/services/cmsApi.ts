@@ -128,13 +128,21 @@ async function apiRequest<T>(url: string, options: RequestInit & { silent?: bool
     }
 
     if (res.status === 401) {
+      setAdminToken(null);
       if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('fujifinder_admin_session');
+        } catch {}
         window.dispatchEvent(new CustomEvent('cms:auth-expired', { detail: { message: errMessage } }));
       }
     }
 
     if (!silent) {
-      console.error(`[CMS API] HTTP ${res.status} for ${url}:`, errMessage);
+      if (res.status === 401) {
+        console.warn(`[CMS API] HTTP 401 for ${url}:`, errMessage);
+      } else {
+        console.error(`[CMS API] HTTP ${res.status} for ${url}:`, errMessage);
+      }
     }
     throw new Error(errMessage);
   }
@@ -202,6 +210,22 @@ export async function loginAdminApi(email: string, password: string): Promise<{ 
   });
 
   if (authError) {
+    // Attempt fallback to local Express admin auth endpoint (/api/auth/login)
+    try {
+      const localRes = await apiRequest<{ success: boolean; token: string; user: AdminUser }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: cleanEmail, password }),
+        silent: true,
+      });
+
+      if (localRes?.success && localRes?.token && localRes?.user) {
+        setAdminToken(localRes.token);
+        return { token: localRes.token, user: localRes.user };
+      }
+    } catch {
+      // Continue to Supabase error translation
+    }
+
     const rawMsg = authError.message || '';
     const errCode = (authError as any).code || '';
     const status = (authError as any).status;
@@ -488,9 +512,10 @@ export async function verifyAdminSessionApi(): Promise<{ authenticated: boolean;
 // ADMIN CMS PERSISTENCE & DATA MANAGEMENT
 // -------------------------------------------------------------
 
-export async function fetchAdminSiteData(): Promise<AdminSiteResponse> {
+export async function fetchAdminSiteData(silent = false): Promise<AdminSiteResponse> {
   return apiRequest<AdminSiteResponse>('/api/site/admin', {
     method: 'GET',
+    silent,
   });
 }
 
