@@ -16,12 +16,14 @@ import {
   initialSiteSettings,
   initialHomePageSettings,
 } from '../data/initialData';
+import { supabase } from '../services/supabase';
 import {
   fetchPublishedSiteData,
   fetchAdminSiteData,
   checkPublishedVersion,
   loginAdminApi,
   logoutAdminApi,
+  verifyAdminSessionApi,
   saveArticleApi,
   deleteArticleApi,
   saveCameraApi,
@@ -168,9 +170,73 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const isAdminLoggedIn = Boolean(adminUser && getAdminToken());
+  const isAdminLoggedIn = Boolean(
+    adminUser &&
+    getAdminToken() &&
+    (adminUser.role === 'Super Admin' || adminUser.role === 'Admin')
+  );
   const versionRef = useRef(publishedVersion);
   versionRef.current = publishedVersion;
+
+  // -------------------------------------------------------------
+  // SUPABASE AUTH SESSION SYNC & REALTIME STATE LISTENER
+  // -------------------------------------------------------------
+  useEffect(() => {
+    let isMounted = true;
+
+    // 1. Check existing Supabase session on startup
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+      if (session?.user && session?.access_token) {
+        setAdminToken(session.access_token);
+        try {
+          const verifyRes = await verifyAdminSessionApi();
+          if (isMounted && verifyRes.authenticated && verifyRes.user) {
+            setAdminUser(verifyRes.user);
+            try {
+              localStorage.setItem(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(verifyRes.user));
+            } catch {}
+          } else if (isMounted && !verifyRes.authenticated) {
+            setAdminUser(null);
+            setAdminToken(null);
+            try {
+              localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[DataContext] Session verify check warning:', e);
+        }
+      }
+    });
+
+    // 2. Realtime listener for login, logout, and token refresh
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_OUT' || !session) {
+        setAdminUser(null);
+        setAdminToken(null);
+        try {
+          localStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION);
+        } catch {}
+      } else if (session?.access_token) {
+        setAdminToken(session.access_token);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          const verifyRes = await verifyAdminSessionApi();
+          if (isMounted && verifyRes.authenticated && verifyRes.user) {
+            setAdminUser(verifyRes.user);
+            try {
+              localStorage.setItem(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(verifyRes.user));
+            } catch {}
+          }
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   // -------------------------------------------------------------
   // DATA FETCHING & SYNCHRONIZATION FROM SERVER BACKEND

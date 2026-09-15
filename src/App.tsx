@@ -26,7 +26,9 @@ const MainLayout: React.FC = () => {
       const search = window.location.search;
       const hash = window.location.hash;
 
-      if (path.includes('unsubscribe') || search.includes('action=unsubscribe') || hash.includes('unsubscribe')) {
+      if (path.includes('admin') || hash.includes('admin')) {
+        navigateTo('admin');
+      } else if (path.includes('unsubscribe') || search.includes('action=unsubscribe') || hash.includes('unsubscribe')) {
         navigateTo('unsubscribe');
       } else if (
         path.includes('confirm') || 

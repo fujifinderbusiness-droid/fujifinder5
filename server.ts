@@ -894,14 +894,99 @@ function extractBearerToken(req: Request): string | null {
   return null;
 }
 
-function requireAdminAuth(req: Request, res: Response, next: any) {
+/**
+ * Validate either a local session token or a Supabase Auth access token
+ */
+async function verifyAdminAuthToken(token: string): Promise<{ valid: boolean; user?: any; error?: string }> {
+  if (!token) {
+    return { valid: false, error: 'Session token missing.' };
+  }
+
+  // 1. Backward compatibility: check local / HMAC session token
+  if (cmsStore.validateSessionToken(token)) {
+    return { valid: true, user: cmsStore.getAdminUser() };
+  }
+
+  // 2. Verify Supabase Auth JWT token
+  try {
+    const sb = supabaseService.getClient();
+    const { data: { user }, error } = await sb.auth.getUser(token);
+    if (!error && user && user.email) {
+      const email = user.email.toLowerCase();
+
+      // Retrieve role and profile from public.admin_users by auth_id (or email fallback)
+      let adminRecord: any = null;
+      try {
+        const { data: dbUserByAuthId } = await sb
+          .from('admin_users')
+          .select('*')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+
+        if (dbUserByAuthId) {
+          adminRecord = dbUserByAuthId;
+        } else {
+          const { data: dbUserByEmail } = await sb
+            .from('admin_users')
+            .select('*')
+            .ilike('email', email)
+            .maybeSingle();
+          if (dbUserByEmail) adminRecord = dbUserByEmail;
+        }
+      } catch (dbErr) {
+        console.warn('[verifyAdminAuthToken] db admin_users query warning:', dbErr);
+      }
+
+      // Default Super Admin privilege if matching default admin email or if recorded as Admin/Super Admin
+      const isConfiguredAdminEmail = email === (cmsStore.getAdminUser().email || '').toLowerCase() ||
+        email === 'fujifinderbusiness@gmail.com';
+      const role = adminRecord?.role || (isConfiguredAdminEmail ? 'Super Admin' : null);
+
+      if (role === 'Super Admin' || role === 'Admin') {
+        const adminProfile = {
+          id: adminRecord?.id || user.id,
+          email: adminRecord?.email || user.email,
+          name: adminRecord?.name || user.user_metadata?.name || 'Admin FujiFinder',
+          role: role,
+          avatar: adminRecord?.avatar || user.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+          lastLogin: new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        };
+        return { valid: true, user: adminProfile };
+      }
+
+      return { valid: false, error: 'Akses ditolak: Akun tidak memiliki hak akses Super Admin atau Admin.' };
+    }
+  } catch (err: any) {
+    console.warn('[verifyAdminAuthToken] Supabase getUser exception:', err?.message || err);
+  }
+
+  return { valid: false, error: 'Unauthorized. Admin session expired or invalid. Please log in again.' };
+}
+
+async function requireAdminAuth(req: Request, res: Response, next: any) {
   const token = extractBearerToken(req);
-  if (!token || !cmsStore.validateSessionToken(token)) {
+  if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'Unauthorized. Admin session expired or invalid. Please log in again.',
+      error: 'Unauthorized. Admin session token missing. Please log in again.',
     });
   }
+
+  const result = await verifyAdminAuthToken(token);
+  if (!result.valid) {
+    return res.status(401).json({
+      success: false,
+      error: result.error || 'Unauthorized. Admin session expired or invalid. Please log in again.',
+    });
+  }
+
+  (req as any).adminUser = result.user;
   next();
 }
 
@@ -972,14 +1057,18 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
 });
 
 /**
- * 5b. ADMIN: Verify Session Token
+ * 5b. ADMIN: Verify Session Token (supports Supabase Auth tokens and local tokens)
  */
-app.get('/api/auth/verify', (req: Request, res: Response) => {
+app.get('/api/auth/verify', async (req: Request, res: Response) => {
   const token = extractBearerToken(req);
-  if (!token || !cmsStore.validateSessionToken(token)) {
-    return res.status(401).json({ success: false, authenticated: false, error: 'Session expired or invalid.' });
+  if (!token) {
+    return res.status(401).json({ success: false, authenticated: false, error: 'Session token missing.' });
   }
-  return res.json({ success: true, authenticated: true, user: cmsStore.getAdminUser() });
+  const result = await verifyAdminAuthToken(token);
+  if (!result.valid) {
+    return res.status(401).json({ success: false, authenticated: false, error: result.error || 'Session expired or invalid.' });
+  }
+  return res.json({ success: true, authenticated: true, user: result.user });
 });
 
 /**

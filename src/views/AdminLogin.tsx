@@ -96,7 +96,7 @@ export const AdminLogin: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder=""
+                  placeholder="fujifinderbusiness@gmail.com"
                   autoComplete="email"
                   required
                   className="w-full bg-[#1A1A1A] border border-[#2E2E2E] focus:border-white text-white rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm placeholder:text-[#555] focus:outline-none transition-colors"

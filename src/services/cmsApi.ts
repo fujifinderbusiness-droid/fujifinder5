@@ -14,6 +14,7 @@ import {
   ReusableSection,
   GlobalDesignSystem,
 } from '../types/builderTypes';
+import { supabase } from './supabase';
 
 const TOKEN_KEY = 'fujifinder_admin_token';
 const SAVED_VERSION_KEY = 'fujifinder_published_version';
@@ -188,23 +189,176 @@ export async function recordAffiliateClickApi(click: AffiliateClickLog): Promise
 }
 
 // -------------------------------------------------------------
-// AUTHENTICATION
+// AUTHENTICATION (SUPABASE AUTH + ADMIN_USERS ROLE VALIDATION)
 // -------------------------------------------------------------
 
 export async function loginAdminApi(email: string, password: string): Promise<{ token: string; user: AdminUser }> {
-  const res = await apiRequest<{ success: boolean; token: string; user: AdminUser }>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
+  const cleanEmail = email.trim();
+
+  // 1. Authenticate with Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email: cleanEmail,
+    password,
   });
-  if (res.token) {
-    setAdminToken(res.token);
+
+  if (authError) {
+    const rawMsg = authError.message || '';
+    const errCode = (authError as any).code || '';
+    const status = (authError as any).status;
+
+    let userFriendlyError = rawMsg;
+
+    if (
+      rawMsg.includes('Invalid login credentials') ||
+      errCode === 'invalid_credentials' ||
+      rawMsg.includes('invalid_grant')
+    ) {
+      userFriendlyError = 'Email atau kata sandi tidak valid. Pastikan email dan kata sandi yang Anda masukkan sudah benar.';
+    } else if (
+      rawMsg.includes('Email not confirmed') ||
+      errCode === 'email_not_confirmed'
+    ) {
+      userFriendlyError = 'Email belum dikonfirmasi di Supabase Authentication. Silakan periksa inbox email Anda untuk konfirmasi akun.';
+    } else if (
+      rawMsg.toLowerCase().includes('user not found') ||
+      errCode === 'user_not_found'
+    ) {
+      userFriendlyError = 'Pengguna belum terdaftar di Supabase Authentication. Silakan daftarkan akun di Supabase terlebih dahulu.';
+    } else if (
+      rawMsg.includes('Failed to fetch') ||
+      rawMsg.includes('network') ||
+      rawMsg.includes('NetworkError') ||
+      status === 503
+    ) {
+      userFriendlyError = 'Gagal terhubung ke server Supabase. Silakan periksa koneksi internet Anda atau coba sesaat lagi.';
+    } else if (
+      rawMsg.includes('rate limit') ||
+      status === 429
+    ) {
+      userFriendlyError = 'Terlalu banyak percobaan masuk. Mohon tunggu beberapa saat sebelum mencoba kembali.';
+    }
+
+    throw new Error(userFriendlyError);
   }
-  return res;
+
+  // 1. Ambil session Supabase & 2. Dapatkan auth.uid()
+  const session = authData?.session;
+  const authUser = authData?.user;
+  const authUid = authUser?.id;
+
+  if (!session || !authUser || !authUid) {
+    await supabase.auth.signOut();
+    throw new Error('Gagal mendapatkan sesi autentikasi (auth.uid) dari Supabase. Silakan coba kembali.');
+  }
+
+  const token = session.access_token;
+  setAdminToken(token);
+
+  // 3. Cari record pada public.admin_users berdasarkan: auth_id = auth.uid()
+  let adminRecord: any = null;
+  let dbQueryError: any = null;
+
+  try {
+    const { data: recordByAuthId, error: errAuthId } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('auth_id', authUid)
+      .maybeSingle();
+
+    if (errAuthId) {
+      dbQueryError = errAuthId;
+      console.warn('[cmsApi] admin_users query by auth_id error:', errAuthId);
+    } else if (recordByAuthId) {
+      adminRecord = recordByAuthId;
+    }
+  } catch (err: any) {
+    dbQueryError = err;
+    console.warn('[cmsApi] Exception querying admin_users by auth_id:', err);
+  }
+
+  // Fallback: Jika belum terhubung auth_id di baris tabel, coba cari berdasarkan email
+  if (!adminRecord) {
+    try {
+      const { data: recordByEmail, error: errEmail } = await supabase
+        .from('admin_users')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (!errEmail && recordByEmail) {
+        adminRecord = recordByEmail;
+      }
+    } catch (err) {
+      console.warn('[cmsApi] admin_users query fallback by email error:', err);
+    }
+  }
+
+  // Fallback 2: Cek verifikasi ke backend endpoint (menggunakan koneksi server-side)
+  if (!adminRecord) {
+    try {
+      const verifyRes = await verifyAdminSessionApi();
+      if (verifyRes.authenticated && verifyRes.user) {
+        adminRecord = verifyRes.user;
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
+  // 6. Jika tidak ada record admin, tolak akses
+  if (!adminRecord) {
+    await supabase.auth.signOut();
+    setAdminToken(null);
+    throw new Error(
+      `Akses ditolak: Akun (${cleanEmail}) berhasil terautentikasi di Supabase Auth, tetapi tidak ditemukan dalam daftar tabel public.admin_users.`
+    );
+  }
+
+  // 4. Pastikan record tersebut memiliki role: Super Admin (atau Admin)
+  // 7. Jika role tidak memiliki akses admin, tolak akses
+  const role = adminRecord.role;
+  const isSuperAdmin = role === 'Super Admin';
+  const isAdmin = role === 'Admin';
+
+  if (!isSuperAdmin && !isAdmin) {
+    await supabase.auth.signOut();
+    setAdminToken(null);
+    throw new Error(
+      `Akses ditolak: Akun Anda memiliki role '${role || 'User'}'. Hak akses 'Super Admin' diperlukan untuk mengelola FujiFinder CMS.`
+    );
+  }
+
+  // 5. Jika valid, izinkan user masuk ke Dashboard CMS
+  const user: AdminUser = {
+    id: adminRecord.id || authUid,
+    email: adminRecord.email || authUser.email || cleanEmail,
+    name: adminRecord.name || authUser.user_metadata?.name || 'Admin FujiFinder',
+    role: role,
+    avatar: adminRecord.avatar || userMetadataAvatar(authUser),
+    lastLogin: new Date().toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  };
+
+  return { token, user };
+}
+
+function userMetadataAvatar(user: any): string {
+  return (
+    user?.user_metadata?.avatar_url ||
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+  );
 }
 
 export async function logoutAdminApi(): Promise<void> {
   try {
-    await apiRequest('/api/auth/logout', { method: 'POST' });
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.warn('[cmsApi] Supabase signOut error:', err);
   } finally {
     setAdminToken(null);
   }
@@ -212,6 +366,63 @@ export async function logoutAdminApi(): Promise<void> {
 
 export async function verifyAdminSessionApi(): Promise<{ authenticated: boolean; user?: AdminUser }> {
   try {
+    // 1. Check Supabase session first
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.warn('[cmsApi] getSession error:', sessionError);
+    }
+
+    if (session && session.user && session.access_token) {
+      setAdminToken(session.access_token);
+      const authUid = session.user.id;
+      const email = session.user.email || '';
+
+      // Query admin_users by auth_id = auth.uid()
+      let profile: any = null;
+      try {
+        const { data: profileByAuthId } = await supabase
+          .from('admin_users')
+          .select('*')
+          .eq('auth_id', authUid)
+          .maybeSingle();
+
+        if (profileByAuthId) {
+          profile = profileByAuthId;
+        } else {
+          const { data: profileByEmail } = await supabase
+            .from('admin_users')
+            .select('*')
+            .ilike('email', email)
+            .maybeSingle();
+          if (profileByEmail) profile = profileByEmail;
+        }
+      } catch (err) {
+        console.warn('[cmsApi] verifyAdminSessionApi query admin_users warning:', err);
+      }
+
+      const isSuperAdminEmail = email.toLowerCase() === 'fujifinderbusiness@gmail.com';
+      const role = profile?.role || (isSuperAdminEmail ? 'Super Admin' : null);
+
+      if (role === 'Super Admin' || role === 'Admin') {
+        const adminUser: AdminUser = {
+          id: profile?.id || session.user.id,
+          email: profile?.email || email,
+          name: profile?.name || session.user.user_metadata?.name || 'Admin FujiFinder',
+          role: role,
+          avatar: profile?.avatar || userMetadataAvatar(session.user),
+          lastLogin: new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        };
+        return { authenticated: true, user: adminUser };
+      }
+    }
+
+    // 2. Fallback to server verify endpoint
     const res = await apiRequest<{ success: boolean; authenticated: boolean; user?: AdminUser }>('/api/auth/verify', {
       method: 'GET',
       silent: true,
