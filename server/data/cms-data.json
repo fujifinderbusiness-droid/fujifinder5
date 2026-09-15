@@ -1219,6 +1219,62 @@
       "status": "published",
       "views": 0,
       "affiliateClicks": 0
+    },
+    {
+      "id": "art-1789344545137",
+      "slug": "efhiahfif",
+      "title": "efhiahfif",
+      "subtitle": "",
+      "excerpt": "",
+      "category": "Mirrorless",
+      "author": {
+        "name": "Editorial Staff",
+        "role": "Staff Writer & Gear Analyst",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+        "bio": "FujiFinder editorial lab researcher and field tester."
+      },
+      "publishedAt": "2026-09-14T00:00:00+00:00",
+      "updatedAt": "2026-09-14T00:09:10.517+00:00",
+      "readTimeMinutes": 7,
+      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+      "featured": false,
+      "blocks": [
+        {
+          "id": "b1",
+          "text": "Tulis ringkasan pengujian dan pengantar ulasan di sini...",
+          "type": "paragraph"
+        },
+        {
+          "id": "b2",
+          "text": "Desain Bodi & Ergonomi",
+          "type": "heading2"
+        },
+        {
+          "id": "b3",
+          "text": "Jelaskan sensasi genggaman, dial fisik kontrol, dan ketahanan bodi kamera.",
+          "type": "paragraph"
+        }
+      ],
+      "featuredCameraIds": [
+        "fuji-x100vi"
+      ],
+      "relatedArticleSlugs": [],
+      "seo": {
+        "ogImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+        "ogTitle": "efhiahfif",
+        "metaTitle": "efhiahfif",
+        "schemaType": "Article",
+        "canonicalUrl": "",
+        "focusKeyword": "efhiahfif",
+        "ogDescription": "",
+        "primaryKeyword": "efhiahfif",
+        "metaDescription": "",
+        "secondaryKeywords": [],
+        "customCanonicalOverride": false
+      },
+      "status": "published",
+      "views": 120,
+      "affiliateClicks": 0
     }
   ],
   "mediaAssets": [],

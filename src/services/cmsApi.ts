@@ -364,6 +364,57 @@ export async function logoutAdminApi(): Promise<void> {
   }
 }
 
+/**
+ * Sends a password recovery email using Supabase Auth.
+ * The redirect URL is dynamically generated from window.location.origin in production.
+ */
+export async function resetAdminPasswordApi(email: string): Promise<{ success: boolean }> {
+  const cleanEmail = email.trim();
+  if (!cleanEmail) {
+    throw new Error('Alamat email admin tidak boleh kosong.');
+  }
+
+  // Derive origin dynamically from window.location, never hardcoded
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : '';
+
+  const redirectTo = `${origin}/reset-password`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+    redirectTo,
+  });
+
+  if (error) {
+    let msg = error.message;
+    if (msg.includes('rate limit') || (error as any).status === 429) {
+      msg = 'Terlalu banyak permintaan pemulihan kata sandi. Mohon tunggu beberapa saat sebelum mencoba lagi.';
+    }
+    throw new Error(msg);
+  }
+
+  return { success: true };
+}
+
+/**
+ * Updates the user's password in Supabase Auth during an active recovery session.
+ */
+export async function updateUserPasswordApi(newPassword: string): Promise<{ success: boolean }> {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Kata sandi baru minimal harus 6 karakter.');
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Gagal memperbarui kata sandi di Supabase Auth.');
+  }
+
+  return { success: true };
+}
+
 export async function verifyAdminSessionApi(): Promise<{ authenticated: boolean; user?: AdminUser }> {
   try {
     // 1. Check Supabase session first

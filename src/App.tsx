@@ -13,20 +13,28 @@ import { ArticleDetailPage } from './views/ArticleDetailPage';
 import { ComparisonsPage } from './views/ComparisonsPage';
 import { AdminCMS } from './views/AdminCMS';
 import { AdminLogin } from './views/AdminLogin';
+import { ResetPasswordPage } from './views/ResetPasswordPage';
 import { UnsubscribePage } from './views/UnsubscribePage';
 import { ConfirmSubscriptionPage } from './views/ConfirmSubscriptionPage';
 
 const MainLayout: React.FC = () => {
   const { currentView, navigateTo, isAdminLoggedIn } = useData();
 
-  // Route listener for email tokens in URL (?token= or #unsubscribe or #confirm-subscription)
+  // Route listener for email tokens in URL (?token= or #unsubscribe or #confirm-subscription or #reset-password)
   useEffect(() => {
     const handleUrlRouting = () => {
       const path = window.location.pathname;
       const search = window.location.search;
       const hash = window.location.hash;
 
-      if (path.includes('admin') || hash.includes('admin')) {
+      if (
+        path.includes('reset-password') || 
+        hash.includes('reset-password') || 
+        search.includes('type=recovery') || 
+        hash.includes('type=recovery')
+      ) {
+        navigateTo('reset-password');
+      } else if (path.includes('admin') || hash.includes('admin')) {
         navigateTo('admin');
       } else if (path.includes('unsubscribe') || search.includes('action=unsubscribe') || hash.includes('unsubscribe')) {
         navigateTo('unsubscribe');
@@ -51,6 +59,15 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentView]);
+
+  if (currentView === 'reset-password') {
+    return (
+      <div className="min-h-screen bg-[#0E0E0E] text-white">
+        <ResetPasswordPage />
+        <SearchModal />
+      </div>
+    );
+  }
 
   if (currentView === 'admin') {
     if (!isAdminLoggedIn) {

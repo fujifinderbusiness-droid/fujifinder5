@@ -24,9 +24,12 @@ function getBaseUrl(req: Request): string {
   if (process.env.APP_URL && !process.env.APP_URL.includes('MY_APP_URL') && process.env.APP_URL.trim() !== '') {
     return process.env.APP_URL.replace(/\/$/, '');
   }
-  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
-  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
-  return `${proto}://${host}`;
+  const host = req.get('x-forwarded-host') || req.get('host');
+  const proto = req.get('x-forwarded-proto') || (req.secure ? 'https' : 'http');
+  if (host) {
+    return `${proto}://${host}`;
+  }
+  return '';
 }
 
 // Simple in-memory rate limiter for public endpoints

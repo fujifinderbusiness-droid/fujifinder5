@@ -220,7 +220,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch {}
       } else if (session?.access_token) {
         setAdminToken(session.access_token);
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (event === 'PASSWORD_RECOVERY') {
+          setCurrentView('reset-password');
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           const verifyRes = await verifyAdminSessionApi();
           if (isMounted && verifyRes.authenticated && verifyRes.user) {
             setAdminUser(verifyRes.user);
