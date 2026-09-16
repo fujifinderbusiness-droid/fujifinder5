@@ -1,7 +1,7 @@
 {
-  "version": 9,
-  "published_at": "2026-09-14T00:07:53.285Z",
-  "updated_at": "2026-09-14T00:07:53.285Z",
+  "version": 10,
+  "published_at": "2026-09-15T12:58:07.347Z",
+  "updated_at": "2026-09-15T12:58:07.347Z",
   "pages": [
     {
       "id": "page-landing",
@@ -1185,40 +1185,53 @@
   ],
   "articles": [
     {
-      "id": "art-fuji-field-test",
-      "slug": "fujifilm-x100vi-field-review",
-      "title": "Fujifilm X100VI In-Depth Field Review",
-      "subtitle": "",
-      "excerpt": "",
+      "id": "test-article-curl",
+      "title": "Test Camera Review",
+      "slug": "test-camera-review",
+      "subtitle": "A hands-on field evaluation",
+      "excerpt": "Testing the persistence flow",
       "category": "Mirrorless",
+      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32",
       "author": {
-        "name": "FujiFinder Editorial",
-        "role": "Senior Optical Reviewer",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-        "bio": "Camera reviewer and documentary photographer."
+        "name": "Editorial Staff",
+        "role": "Staff Writer",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
+        "bio": "Field tester"
       },
-      "publishedAt": "2026-09-12T07:03:54.293059+00:00",
-      "updatedAt": "2026-09-11T07:35:06.200326+00:00",
+      "status": "published",
+      "publishedAt": "2026-09-15",
+      "updatedAt": "2026-09-15",
       "readTimeMinutes": 5,
-      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
       "featured": false,
+      "views": 0,
+      "affiliateClicks": 0,
       "blocks": [
         {
           "id": "b1",
-          "text": "Field review content...",
-          "type": "paragraph"
+          "type": "paragraph",
+          "text": "Hello world"
         }
       ],
       "featuredCameraIds": [],
       "relatedArticleSlugs": [],
+      "showOnLandingPage": true,
+      "isHeroFeatured": false,
+      "isFeaturedStory": false,
+      "isTrending": true,
+      "isLatest": true,
       "seo": {
-        "title": "",
-        "keywords": [],
-        "description": ""
-      },
-      "status": "published",
-      "views": 0,
-      "affiliateClicks": 0
+        "metaTitle": "Test Camera Review",
+        "metaDescription": "Testing",
+        "focusKeyword": "test",
+        "primaryKeyword": "test",
+        "secondaryKeywords": [],
+        "customCanonicalOverride": false,
+        "canonicalUrl": "",
+        "ogTitle": "Test Camera Review",
+        "ogDescription": "Testing the persistence flow",
+        "ogImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32",
+        "schemaType": "Article"
+      }
     },
     {
       "id": "art-1789344545137",
@@ -1274,6 +1287,42 @@
       },
       "status": "published",
       "views": 120,
+      "affiliateClicks": 0
+    },
+    {
+      "id": "art-fuji-field-test",
+      "slug": "fujifilm-x100vi-field-review",
+      "title": "Fujifilm X100VI In-Depth Field Review",
+      "subtitle": "",
+      "excerpt": "",
+      "category": "Mirrorless",
+      "author": {
+        "name": "FujiFinder Editorial",
+        "role": "Senior Optical Reviewer",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+        "bio": "Camera reviewer and documentary photographer."
+      },
+      "publishedAt": "2026-09-12T07:03:54.293059+00:00",
+      "updatedAt": "2026-09-15T07:43:27.002156+00:00",
+      "readTimeMinutes": 5,
+      "coverImage": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+      "featured": false,
+      "blocks": [
+        {
+          "id": "b1",
+          "text": "Field review content...",
+          "type": "paragraph"
+        }
+      ],
+      "featuredCameraIds": [],
+      "relatedArticleSlugs": [],
+      "seo": {
+        "title": "",
+        "keywords": [],
+        "description": ""
+      },
+      "status": "published",
+      "views": 0,
       "affiliateClicks": 0
     }
   ],

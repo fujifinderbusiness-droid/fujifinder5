@@ -1302,14 +1302,33 @@ app.get('/api/articles/:id', (req: Request, res: Response) => {
   return res.json({ success: true, article });
 });
 
-app.post('/api/articles', requireAdminAuth, (req: Request, res: Response) => {
-  const { article } = req.body || {};
-  const artToSave = article || req.body;
-  if (!artToSave || !artToSave.id || !artToSave.title) {
-    return res.status(400).json({ success: false, error: 'Valid article object is required.' });
+app.post('/api/articles', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { article } = req.body || {};
+    const artToSave = article || req.body;
+
+    if (!artToSave || !artToSave.id || !artToSave.title) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid article object is required.',
+      });
+    }
+
+    const result = await cmsStore.saveArticle(artToSave);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Article saved successfully.',
+      ...result,
+    });
+  } catch (err: any) {
+    console.error('[API] POST /api/articles failed:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to save article.',
+    });
   }
-  const result = cmsStore.saveArticle(artToSave);
-  return res.json({ success: true, message: 'Changes published successfully.', ...result });
 });
 
 app.put('/api/articles/:id', requireAdminAuth, (req: Request, res: Response) => {

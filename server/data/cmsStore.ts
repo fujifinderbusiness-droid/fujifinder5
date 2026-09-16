@@ -673,30 +673,34 @@ class CMSStore {
   // CORE CMS ENTITY OPERATIONS (ARTICLES, CAMERAS, SETTINGS)
   // -------------------------------------------------------------
 
-  public saveArticle(article: Article): { article: Article; published_version: number } {
+  public async saveArticle(article: Article): Promise<{ article: Article; published_version: number }> {
+    const rawId = article.id || `art-${Date.now()}`;
+    const rawTitle = (article.title || 'Untitled Article').trim();
+    const rawSlug = (article.slug || rawTitle || 'article').trim();
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .replace(/^\/+|\/+$/g, '')
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-+|-+$/g, '') || `article-${Date.now()}`;
+
     const cleanArticle: Article = {
       ...article,
-      id: article.id || `art-${Date.now()}`,
-      title: (article.title || 'Untitled Article').trim(),
-      slug: (article.slug || article.title || 'article')
-        .toLowerCase()
-        .trim()
-        .replace(/^\/+|\/+$/g, '')
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/--+/g, '-')
-        .replace(/^-+|-+$/g, ''),
+      id: rawId,
+      title: rawTitle,
+      slug: cleanSlug,
       subtitle: article.subtitle || '',
       excerpt: article.excerpt || '',
       category: article.category || 'Mirrorless',
       coverImage: article.coverImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80',
       author: article.author ? {
         name: article.author.name || 'Editorial Staff',
-        role: article.author.role || 'Staff Writer',
+        role: article.author.role || 'Staff Writer & Gear Analyst',
         avatar: article.author.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         bio: article.author.bio || '',
       } : {
         name: 'Editorial Staff',
-        role: 'Staff Writer',
+        role: 'Staff Writer & Gear Analyst',
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         bio: '',
       },
@@ -708,7 +712,7 @@ class CMSStore {
       featuredCameraIds: Array.isArray(article.featuredCameraIds) ? article.featuredCameraIds : [],
       relatedArticleSlugs: Array.isArray(article.relatedArticleSlugs) ? article.relatedArticleSlugs : [],
       seo: {
-        metaTitle: article.seo?.metaTitle || (article.seo as any)?.title || article.title || '',
+        metaTitle: article.seo?.metaTitle || (article.seo as any)?.title || rawTitle,
         metaDescription: article.seo?.metaDescription || (article.seo as any)?.description || article.excerpt || '',
         focusKeyword: article.seo?.focusKeyword || (article.seo as any)?.keywords?.[0] || '',
         primaryKeyword: article.seo?.primaryKeyword || article.seo?.focusKeyword || '',
@@ -717,12 +721,31 @@ class CMSStore {
           : (Array.isArray((article.seo as any)?.keywords) ? (article.seo as any).keywords : []),
         customCanonicalOverride: Boolean(article.seo?.customCanonicalOverride),
         canonicalUrl: article.seo?.canonicalUrl || '',
-        ogTitle: article.seo?.ogTitle || article.title || '',
+        ogTitle: article.seo?.ogTitle || rawTitle,
         ogDescription: article.seo?.ogDescription || article.excerpt || '',
         ogImage: article.seo?.ogImage || article.coverImage || '',
         schemaType: article.seo?.schemaType || 'Article',
       },
+
+      // Core Placement Controls (MUST be preserved so articles display on Landing Page & Catalog)
+      showOnLandingPage: article.showOnLandingPage !== undefined ? Boolean(article.showOnLandingPage) : true,
+      isHeroFeatured: Boolean(article.isHeroFeatured),
+      isFeaturedStory: Boolean(article.isFeaturedStory),
+      isTrending: Boolean(article.isTrending),
+      isPopularNow: Boolean(article.isPopularNow),
+      isFeaturedContent: Boolean(article.isFeaturedContent),
+      isLatest: article.isLatest !== undefined ? Boolean(article.isLatest) : true,
+      featured: Boolean(article.featured || article.isHeroFeatured || article.isFeaturedStory),
+      views: typeof article.views === 'number' ? article.views : 0,
+      affiliateClicks: typeof article.affiliateClicks === 'number' ? article.affiliateClicks : 0,
     };
+
+    // Await persistence to Supabase first
+    const supabaseResult = await supabaseService.saveArticle(cleanArticle);
+    if (!supabaseResult.success) {
+      console.error('[CMSStore] Failed to persist article to Supabase:', supabaseResult.error);
+      throw new Error(supabaseResult.error || 'Failed to save article to Supabase database.');
+    }
 
     const index = this.data.articles.findIndex((a) => a.id === cleanArticle.id);
     if (index >= 0) {
@@ -734,25 +757,21 @@ class CMSStore {
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
-    // Asynchronously synchronize with Supabase articles table
-    supabaseService.saveArticle(cleanArticle).catch((err) => {
-      console.error('[CMSStore] Background Supabase article sync failed:', err);
-    });
-
     return { article: cleanArticle, published_version: this.data.version };
   }
 
-  public deleteArticle(id: string): { published_version: number } {
+  public async deleteArticle(id: string): Promise<{ success: boolean; published_version: number }> {
+    const supabaseResult = await supabaseService.deleteArticle(id);
+    if (!supabaseResult.success) {
+      console.error('[CMSStore] Failed to delete article from Supabase:', supabaseResult.error);
+      throw new Error(supabaseResult.error || 'Failed to delete article from Supabase database.');
+    }
+
     this.data.articles = this.data.articles.filter((a) => a.id !== id);
     this.bumpPublishedVersion();
     this.persistData(this.data);
 
-    // Synchronize delete with Supabase
-    supabaseService.deleteArticle(id).catch((err) => {
-      console.error('[CMSStore] Background Supabase article delete failed:', err);
-    });
-
-    return { published_version: this.data.version };
+    return { success: true, published_version: this.data.version };
   }
 
   public saveCamera(camera: CameraProduct): { camera: CameraProduct; published_version: number } {

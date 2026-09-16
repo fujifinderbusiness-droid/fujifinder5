@@ -42,7 +42,7 @@ class SupabaseService {
   };
 
   constructor() {
-    this.client = createClient(supabaseUrl, supabaseAnonKey, {
+  this.client = createClient(supabaseUrl, supabaseServerKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -212,46 +212,77 @@ class SupabaseService {
     try {
       const { data, error } = await this.client.from('articles').select('*');
       if (error) {
-        console.error('[Supabase] Error fetching articles:', error.message);
+        console.error('[Supabase] Error fetching articles:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
         return [];
       }
       if (!data) return [];
 
       return data.map((row: any): Article => {
         const rawData = row.data && typeof row.data === 'object' ? row.data : {};
-        const authorName = typeof row.author === 'string' ? row.author : (rawData.author?.name || 'FujiFinder Editorial');
+        const authorObj = typeof row.author === 'object' && row.author !== null
+          ? row.author
+          : (rawData.author && typeof rawData.author === 'object'
+              ? rawData.author
+              : {
+                  name: typeof row.author === 'string' && row.author.trim() ? row.author : 'FujiFinder Editorial',
+                  role: rawData.author?.role || 'Staff Writer & Gear Analyst',
+                  avatar: rawData.author?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+                  bio: rawData.author?.bio || 'Camera reviewer and documentary photographer.',
+                });
 
         return {
+          ...rawData,
           id: row.id,
           slug: row.slug || rawData.slug || row.id,
           title: row.title || rawData.title || 'Untitled Review',
           subtitle: row.subtitle || rawData.subtitle || '',
           excerpt: row.excerpt || rawData.excerpt || '',
-          category: (row.category || rawData.category || 'Reviews') as any,
-          author: {
-            name: authorName,
-            role: rawData.author?.role || 'Senior Optical Reviewer',
-            avatar: rawData.author?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-            bio: rawData.author?.bio || 'Camera reviewer and documentary photographer.',
-          },
-          publishedAt: row.published_at || rawData.publishedAt || row.created_at,
-          updatedAt: row.updated_at || rawData.updatedAt || new Date().toISOString(),
-          readTimeMinutes: row.read_time_minutes || rawData.readTimeMinutes || 5,
+          category: (row.category || rawData.category || 'Mirrorless') as any,
+          author: authorObj,
+          publishedAt: row.published_at
+            ? String(row.published_at).split('T')[0]
+            : (rawData.publishedAt || new Date().toISOString().split('T')[0]),
+          updatedAt: row.updated_at
+            ? String(row.updated_at).split('T')[0]
+            : (rawData.updatedAt || new Date().toISOString().split('T')[0]),
+          readTimeMinutes: typeof row.read_time_minutes === 'number'
+            ? row.read_time_minutes
+            : (typeof rawData.readTimeMinutes === 'number' ? rawData.readTimeMinutes : 5),
           coverImage: row.cover_image || rawData.coverImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80',
           featured: Boolean(row.featured ?? rawData.featured),
-          blocks: Array.isArray(row.blocks) && row.blocks.length > 0 ? row.blocks : (Array.isArray(rawData.blocks) ? rawData.blocks : []),
-          featuredCameraIds: Array.isArray(rawData.featuredCameraIds) 
-            ? rawData.featuredCameraIds 
+          blocks: Array.isArray(row.blocks) && row.blocks.length > 0
+            ? row.blocks
+            : (Array.isArray(rawData.blocks) ? rawData.blocks : []),
+          featuredCameraIds: Array.isArray(rawData.featuredCameraIds) && rawData.featuredCameraIds.length > 0
+            ? rawData.featuredCameraIds
             : (row.related_camera_id ? [row.related_camera_id] : []),
           relatedArticleSlugs: Array.isArray(rawData.relatedArticleSlugs) ? rawData.relatedArticleSlugs : [],
-          seo: row.seo && Object.keys(row.seo).length > 0 ? row.seo : (rawData.seo || {
-            metaTitle: row.title,
-            metaDescription: row.excerpt || '',
-            focusKeyword: 'fujifilm camera review',
-          }),
+          seo: row.seo && Object.keys(row.seo).length > 0
+            ? row.seo
+            : (rawData.seo || {
+                metaTitle: row.title,
+                metaDescription: row.excerpt || '',
+                focusKeyword: 'fujifilm camera review',
+                primaryKeyword: 'fujifilm camera review',
+                secondaryKeywords: [],
+              }),
           status: (row.status || rawData.status || 'published') as any,
           views: typeof row.view_count === 'number' ? row.view_count : (rawData.views || 0),
-          affiliateClicks: rawData.affiliateClicks || 0,
+          affiliateClicks: typeof rawData.affiliateClicks === 'number' ? rawData.affiliateClicks : 0,
+
+          // Core Placement Flags - critical for Public Landing Page and Admin badges
+          showOnLandingPage: rawData.showOnLandingPage !== undefined ? Boolean(rawData.showOnLandingPage) : true,
+          isHeroFeatured: Boolean(rawData.isHeroFeatured),
+          isFeaturedStory: Boolean(rawData.isFeaturedStory),
+          isTrending: Boolean(rawData.isTrending),
+          isPopularNow: Boolean(rawData.isPopularNow),
+          isFeaturedContent: Boolean(rawData.isFeaturedContent),
+          isLatest: rawData.isLatest !== undefined ? Boolean(rawData.isLatest) : true,
         };
       });
     } catch (err: any) {
@@ -260,54 +291,74 @@ class SupabaseService {
     }
   }
 
-  public async saveArticle(art: Article): Promise<boolean> {
+  public async saveArticle(art: Article): Promise<{ success: boolean; error?: string }> {
     try {
-      const authorStr = typeof art.author === 'string' ? art.author : (art.author?.name || 'FujiFinder Editorial');
+      const authorStr = typeof art.author === 'string'
+        ? art.author
+        : (art.author?.name || 'FujiFinder Editorial');
+
       const payload = {
         id: art.id,
         slug: art.slug,
         title: art.title,
-        category: art.category,
+        category: art.category || 'Mirrorless',
         status: art.status || 'published',
         author: authorStr,
         subtitle: art.subtitle || null,
         excerpt: art.excerpt || null,
-        featured: Boolean(art.featured),
+        featured: Boolean(art.featured || art.isHeroFeatured || art.isFeaturedStory),
         cover_image: art.coverImage || null,
         read_time_minutes: art.readTimeMinutes || 5,
-        blocks: art.blocks || [],
+        blocks: Array.isArray(art.blocks) ? art.blocks : [],
         seo: art.seo || {},
         related_camera_id: art.featuredCameraIds?.[0] || null,
         tags: art.seo?.secondaryKeywords || [],
         view_count: art.views || 0,
-        published_at: art.publishedAt || new Date().toISOString(),
+        published_at: art.publishedAt ? new Date(art.publishedAt).toISOString() : new Date().toISOString(),
         data: art,
         updated_at: new Date().toISOString(),
       };
 
+      console.log(`[Supabase] Upserting article "${art.title}" (id: ${art.id}, slug: ${art.slug})...`);
       const { error } = await this.client.from('articles').upsert(payload, { onConflict: 'id' });
       if (error) {
-        console.error('[Supabase] Failed to upsert article:', error.message);
-        return false;
+        console.error('[Supabase] Failed to upsert article:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        return {
+          success: false,
+          error: `${error.message}${error.details ? ` (${error.details})` : ''}`,
+        };
       }
-      return true;
+      console.log(`[Supabase] Article "${art.title}" (id: ${art.id}) saved to Supabase successfully.`);
+      return { success: true };
     } catch (err: any) {
       console.error('[Supabase] Exception upserting article:', err.message);
-      return false;
+      return { success: false, error: err.message || 'Unknown exception saving article to Supabase' };
     }
   }
 
-  public async deleteArticle(id: string): Promise<boolean> {
+  public async deleteArticle(id: string): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log(`[Supabase] Deleting article id: ${id}...`);
       const { error } = await this.client.from('articles').delete().eq('id', id);
       if (error) {
-        console.error('[Supabase] Failed to delete article:', error.message);
-        return false;
+        console.error('[Supabase] Failed to delete article:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        return { success: false, error: error.message };
       }
-      return true;
+      console.log(`[Supabase] Article id ${id} deleted from Supabase successfully.`);
+      return { success: true };
     } catch (err: any) {
       console.error('[Supabase] Exception deleting article:', err.message);
-      return false;
+      return { success: false, error: err.message || 'Unknown exception deleting article from Supabase' };
     }
   }
 
